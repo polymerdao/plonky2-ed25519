@@ -84,13 +84,13 @@ mod tests {
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
     use plonky2_field::field_types::Field;
-    use plonky2_field::secp256k1_scalar::Secp256K1Scalar;
 
     use crate::curve::curve_types::{Curve, CurveScalar};
-    use crate::curve::secp256k1::Secp256K1;
+    use crate::curve::ed25519::Ed25519;
     use crate::gadgets::curve::CircuitBuilderCurve;
     use crate::gadgets::curve_msm::curve_msm_circuit;
     use crate::gadgets::nonnative::CircuitBuilderNonNative;
+    use crate::field::ed25519_scalar::Ed25519Scalar;
 
     #[test]
     #[ignore]
@@ -105,11 +105,11 @@ mod tests {
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
         let p =
-            (CurveScalar(Secp256K1Scalar::rand()) * Secp256K1::GENERATOR_PROJECTIVE).to_affine();
+            (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
         let q =
-            (CurveScalar(Secp256K1Scalar::rand()) * Secp256K1::GENERATOR_PROJECTIVE).to_affine();
-        let n = Secp256K1Scalar::rand();
-        let m = Secp256K1Scalar::rand();
+            (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
+        let n = Ed25519Scalar::rand();
+        let m = Ed25519Scalar::rand();
 
         let res =
             (CurveScalar(n) * p.to_projective() + CurveScalar(m) * q.to_projective()).to_affine();

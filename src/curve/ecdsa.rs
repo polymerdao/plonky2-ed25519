@@ -64,17 +64,17 @@ pub fn verify_message<C: Curve>(
 #[cfg(test)]
 mod tests {
     use plonky2_field::field_types::Field;
-    use plonky2_field::secp256k1_scalar::Secp256K1Scalar;
 
     use crate::curve::ecdsa::{sign_message, verify_message, ECDSASecretKey};
-    use crate::curve::secp256k1::Secp256K1;
+    use crate::curve::ed25519::Ed25519;
+    use crate::field::ed25519_scalar::Ed25519Scalar;
 
     #[test]
     fn test_ecdsa_native() {
-        type C = Secp256K1;
+        type C = Ed25519;
 
-        let msg = Secp256K1Scalar::rand();
-        let sk = ECDSASecretKey::<C>(Secp256K1Scalar::rand());
+        let msg = Ed25519Scalar::rand();
+        let sk = ECDSASecretKey::<C>(Ed25519Scalar::rand());
         let pk = sk.to_public();
 
         let sig = sign_message(msg, sk);

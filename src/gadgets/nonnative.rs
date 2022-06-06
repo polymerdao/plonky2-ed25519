@@ -647,13 +647,13 @@ mod tests {
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
     use plonky2_field::field_types::{Field, PrimeField};
-    use plonky2_field::secp256k1_base::Secp256K1Base;
 
     use crate::gadgets::nonnative::CircuitBuilderNonNative;
+    use crate::field::ed25519_base::Ed25519Base;
 
     #[test]
     fn test_nonnative_add() -> Result<()> {
-        type FF = Secp256K1Base;
+        type FF = Ed25519Base;
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
@@ -680,7 +680,7 @@ mod tests {
 
     #[test]
     fn test_nonnative_many_adds() -> Result<()> {
-        type FF = Secp256K1Base;
+        type FF = Ed25519Base;
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
@@ -720,7 +720,7 @@ mod tests {
 
     #[test]
     fn test_nonnative_sub() -> Result<()> {
-        type FF = Secp256K1Base;
+        type FF = Ed25519Base;
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
@@ -750,7 +750,7 @@ mod tests {
 
     #[test]
     fn test_nonnative_mul() -> Result<()> {
-        type FF = Secp256K1Base;
+        type FF = Ed25519Base;
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
@@ -776,7 +776,7 @@ mod tests {
 
     #[test]
     fn test_nonnative_neg() -> Result<()> {
-        type FF = Secp256K1Base;
+        type FF = Ed25519Base;
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
@@ -800,7 +800,7 @@ mod tests {
 
     #[test]
     fn test_nonnative_inv() -> Result<()> {
-        type FF = Secp256K1Base;
+        type FF = Ed25519Base;
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;

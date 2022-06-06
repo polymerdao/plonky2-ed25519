@@ -101,14 +101,14 @@ mod tests {
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
     use plonky2_field::field_types::Field;
-    use plonky2_field::secp256k1_scalar::Secp256K1Scalar;
 
     use crate::gadgets::nonnative::{CircuitBuilderNonNative, NonNativeTarget};
     use crate::gadgets::split_nonnative::CircuitBuilderSplit;
+    use crate::field::ed25519_scalar::Ed25519Scalar;
 
     #[test]
     fn test_split_nonnative() -> Result<()> {
-        type FF = Secp256K1Scalar;
+        type FF = Ed25519Scalar;
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
@@ -120,7 +120,7 @@ mod tests {
         let x = FF::rand();
         let x_target = builder.constant_nonnative(x);
         let split = builder.split_nonnative_to_4_bit_limbs(&x_target);
-        let combined: NonNativeTarget<Secp256K1Scalar> =
+        let combined: NonNativeTarget<Ed25519Scalar> =
             builder.recombine_nonnative_4_bit_limbs(split);
         builder.connect_nonnative(&x_target, &combined);
 

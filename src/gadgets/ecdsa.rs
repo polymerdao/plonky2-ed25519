@@ -3,14 +3,14 @@ use std::marker::PhantomData;
 use plonky2::hash::hash_types::RichField;
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2_field::extension_field::Extendable;
-use plonky2_field::secp256k1_scalar::Secp256K1Scalar;
 
 use crate::curve::curve_types::Curve;
-use crate::curve::secp256k1::Secp256K1;
+use crate::curve::ed25519::Ed25519;
 use crate::gadgets::curve::{AffinePointTarget, CircuitBuilderCurve};
 use crate::gadgets::curve_fixed_base::fixed_base_curve_mul_circuit;
 use crate::gadgets::glv::CircuitBuilderGlv;
 use crate::gadgets::nonnative::{CircuitBuilderNonNative, NonNativeTarget};
+use crate::field::ed25519_scalar::Ed25519Scalar;
 
 #[derive(Clone, Debug)]
 pub struct ECDSASecretKeyTarget<C: Curve>(NonNativeTarget<C::ScalarField>);
@@ -26,9 +26,9 @@ pub struct ECDSASignatureTarget<C: Curve> {
 
 pub fn verify_message_circuit<F: RichField + Extendable<D>, const D: usize>(
     builder: &mut CircuitBuilder<F, D>,
-    msg: NonNativeTarget<Secp256K1Scalar>,
-    sig: ECDSASignatureTarget<Secp256K1>,
-    pk: ECDSAPublicKeyTarget<Secp256K1>,
+    msg: NonNativeTarget<Ed25519Scalar>,
+    sig: ECDSASignatureTarget<Ed25519>,
+    pk: ECDSAPublicKeyTarget<Ed25519>,
 ) {
     let ECDSASignatureTarget { r, s } = sig;
 
@@ -38,11 +38,11 @@ pub fn verify_message_circuit<F: RichField + Extendable<D>, const D: usize>(
     let u1 = builder.mul_nonnative(&msg, &c);
     let u2 = builder.mul_nonnative(&r, &c);
 
-    let point1 = fixed_base_curve_mul_circuit(builder, Secp256K1::GENERATOR_AFFINE, &u1);
+    let point1 = fixed_base_curve_mul_circuit(builder, Ed25519::GENERATOR_AFFINE, &u1);
     let point2 = builder.glv_mul(&pk.0, &u2);
     let point = builder.curve_add(&point1, &point2);
 
-    let x = NonNativeTarget::<Secp256K1Scalar> {
+    let x = NonNativeTarget::<Ed25519Scalar> {
         value: point.x.value,
         _phantom: PhantomData,
     };
@@ -57,30 +57,30 @@ mod tests {
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
     use plonky2_field::field_types::Field;
-    use plonky2_field::secp256k1_scalar::Secp256K1Scalar;
 
     use super::{ECDSAPublicKeyTarget, ECDSASignatureTarget};
     use crate::curve::curve_types::{Curve, CurveScalar};
     use crate::curve::ecdsa::{sign_message, ECDSAPublicKey, ECDSASecretKey, ECDSASignature};
-    use crate::curve::secp256k1::Secp256K1;
+    use crate::curve::ed25519::Ed25519;
     use crate::gadgets::curve::CircuitBuilderCurve;
     use crate::gadgets::ecdsa::verify_message_circuit;
     use crate::gadgets::nonnative::CircuitBuilderNonNative;
+    use crate::field::ed25519_scalar::Ed25519Scalar;
 
     fn test_ecdsa_circuit_with_config(config: CircuitConfig) -> Result<()> {
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
 
-        type Curve = Secp256K1;
+        type Curve = Ed25519;
 
         let pw = PartialWitness::new();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        let msg = Secp256K1Scalar::rand();
+        let msg = Ed25519Scalar::rand();
         let msg_target = builder.constant_nonnative(msg);
 
-        let sk = ECDSASecretKey::<Curve>(Secp256K1Scalar::rand());
+        let sk = ECDSASecretKey::<Curve>(Ed25519Scalar::rand());
         let pk = ECDSAPublicKey((CurveScalar(sk.0) * Curve::GENERATOR_PROJECTIVE).to_affine());
 
         let pk_target = ECDSAPublicKeyTarget(builder.constant_affine_point(pk.0));

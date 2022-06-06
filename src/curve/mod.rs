@@ -5,4 +5,4 @@ pub mod curve_summation;
 pub mod curve_types;
 pub mod ecdsa;
 pub mod glv;
-pub mod secp256k1;
+pub mod ed25519;

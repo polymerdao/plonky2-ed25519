@@ -189,11 +189,11 @@ mod tests {
     use num::BigUint;
     use plonky2_field::field_types::Field;
     use plonky2_field::field_types::PrimeField;
-    use plonky2_field::secp256k1_scalar::Secp256K1Scalar;
 
     use crate::curve::curve_msm::{msm_execute, msm_precompute, to_digits};
     use crate::curve::curve_types::Curve;
-    use crate::curve::secp256k1::Secp256K1;
+    use crate::curve::ed25519::Ed25519;
+    use crate::field::ed25519_scalar::Ed25519Scalar;
 
     #[test]
     fn test_to_digits() {
@@ -207,10 +207,10 @@ mod tests {
             0b00001111111111111111111111111111,
             0b11111111111111111111111111111111,
         ];
-        let x = Secp256K1Scalar::from_biguint(BigUint::from_slice(&x_canonical));
+        let x = Ed25519Scalar::from_biguint(BigUint::from_slice(&x_canonical));
         assert_eq!(x.to_canonical_biguint().to_u32_digits(), x_canonical);
         assert_eq!(
-            to_digits::<Secp256K1>(&x, 17),
+            to_digits::<Ed25519>(&x, 17),
             vec![
                 0b01010101010101010,
                 0b10101010101010101,
@@ -236,17 +236,17 @@ mod tests {
     fn test_msm() {
         let w = 5;
 
-        let generator_1 = Secp256K1::GENERATOR_PROJECTIVE;
+        let generator_1 = Ed25519::GENERATOR_PROJECTIVE;
         let generator_2 = generator_1 + generator_1;
         let generator_3 = generator_1 + generator_2;
 
-        let scalar_1 = Secp256K1Scalar::from_biguint(BigUint::from_slice(&[
+        let scalar_1 = Ed25519Scalar::from_biguint(BigUint::from_slice(&[
             11111111, 22222222, 33333333, 44444444,
         ]));
-        let scalar_2 = Secp256K1Scalar::from_biguint(BigUint::from_slice(&[
+        let scalar_2 = Ed25519Scalar::from_biguint(BigUint::from_slice(&[
             22222222, 22222222, 33333333, 44444444,
         ]));
-        let scalar_3 = Secp256K1Scalar::from_biguint(BigUint::from_slice(&[
+        let scalar_3 = Ed25519Scalar::from_biguint(BigUint::from_slice(&[
             33333333, 22222222, 33333333, 44444444,
         ]));
 
@@ -256,9 +256,9 @@ mod tests {
         let precomputation = msm_precompute(&generators, w);
         let result_msm = msm_execute(&precomputation, &scalars);
 
-        let result_naive = Secp256K1::convert(scalar_1) * generator_1
-            + Secp256K1::convert(scalar_2) * generator_2
-            + Secp256K1::convert(scalar_3) * generator_3;
+        let result_naive = Ed25519::convert(scalar_1) * generator_1
+            + Ed25519::convert(scalar_2) * generator_2
+            + Ed25519::convert(scalar_3) * generator_3;
 
         assert_eq!(result_msm, result_naive);
     }

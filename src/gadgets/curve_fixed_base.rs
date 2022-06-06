@@ -68,14 +68,14 @@ mod tests {
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
     use plonky2_field::field_types::Field;
     use plonky2_field::field_types::PrimeField;
-    use plonky2_field::secp256k1_scalar::Secp256K1Scalar;
 
     use crate::curve::curve_types::{Curve, CurveScalar};
-    use crate::curve::secp256k1::Secp256K1;
+    use crate::curve::ed25519::Ed25519;
     use crate::gadgets::biguint::witness_set_biguint_target;
     use crate::gadgets::curve::CircuitBuilderCurve;
     use crate::gadgets::curve_fixed_base::fixed_base_curve_mul_circuit;
     use crate::gadgets::nonnative::CircuitBuilderNonNative;
+    use crate::field::ed25519_scalar::Ed25519Scalar;
 
     #[test]
     #[ignore]
@@ -89,14 +89,14 @@ mod tests {
         let mut pw = PartialWitness::new();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        let g = Secp256K1::GENERATOR_AFFINE;
-        let n = Secp256K1Scalar::rand();
+        let g = Ed25519::GENERATOR_AFFINE;
+        let n = Ed25519Scalar::rand();
 
         let res = (CurveScalar(n) * g.to_projective()).to_affine();
         let res_expected = builder.constant_affine_point(res);
         builder.curve_assert_valid(&res_expected);
 
-        let n_target = builder.add_virtual_nonnative_target::<Secp256K1Scalar>();
+        let n_target = builder.add_virtual_nonnative_target::<Ed25519Scalar>();
         witness_set_biguint_target(&mut pw, &n_target.value, &n.to_canonical_biguint());
 
         let res_target = fixed_base_curve_mul_circuit(&mut builder, g, &n_target);

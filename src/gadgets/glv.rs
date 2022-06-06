@@ -7,54 +7,54 @@ use plonky2::iop::witness::PartitionWitness;
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2_field::extension_field::Extendable;
 use plonky2_field::field_types::{Field, PrimeField};
-use plonky2_field::secp256k1_base::Secp256K1Base;
-use plonky2_field::secp256k1_scalar::Secp256K1Scalar;
 
-use crate::curve::glv::{decompose_secp256k1_scalar, GLV_BETA, GLV_S};
-use crate::curve::secp256k1::Secp256K1;
+use crate::curve::glv::{decompose_ed25519_scalar, GLV_BETA, GLV_S};
+use crate::curve::ed25519::Ed25519;
 use crate::gadgets::biguint::{buffer_set_biguint_target, witness_get_biguint_target};
 use crate::gadgets::curve::{AffinePointTarget, CircuitBuilderCurve};
 use crate::gadgets::curve_msm::curve_msm_circuit;
 use crate::gadgets::nonnative::{CircuitBuilderNonNative, NonNativeTarget};
+use crate::field::ed25519_base::Ed25519Base;
+use crate::field::ed25519_scalar::Ed25519Scalar;
 
 pub trait CircuitBuilderGlv<F: RichField + Extendable<D>, const D: usize> {
-    fn secp256k1_glv_beta(&mut self) -> NonNativeTarget<Secp256K1Base>;
+    fn ed25519_glv_beta(&mut self) -> NonNativeTarget<Ed25519Base>;
 
-    fn decompose_secp256k1_scalar(
+    fn decompose_ed25519_scalar(
         &mut self,
-        k: &NonNativeTarget<Secp256K1Scalar>,
+        k: &NonNativeTarget<Ed25519Scalar>,
     ) -> (
-        NonNativeTarget<Secp256K1Scalar>,
-        NonNativeTarget<Secp256K1Scalar>,
+        NonNativeTarget<Ed25519Scalar>,
+        NonNativeTarget<Ed25519Scalar>,
         BoolTarget,
         BoolTarget,
     );
 
     fn glv_mul(
         &mut self,
-        p: &AffinePointTarget<Secp256K1>,
-        k: &NonNativeTarget<Secp256K1Scalar>,
-    ) -> AffinePointTarget<Secp256K1>;
+        p: &AffinePointTarget<Ed25519>,
+        k: &NonNativeTarget<Ed25519Scalar>,
+    ) -> AffinePointTarget<Ed25519>;
 }
 
 impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderGlv<F, D>
     for CircuitBuilder<F, D>
 {
-    fn secp256k1_glv_beta(&mut self) -> NonNativeTarget<Secp256K1Base> {
+    fn ed25519_glv_beta(&mut self) -> NonNativeTarget<Ed25519Base> {
         self.constant_nonnative(GLV_BETA)
     }
 
-    fn decompose_secp256k1_scalar(
+    fn decompose_ed25519_scalar(
         &mut self,
-        k: &NonNativeTarget<Secp256K1Scalar>,
+        k: &NonNativeTarget<Ed25519Scalar>,
     ) -> (
-        NonNativeTarget<Secp256K1Scalar>,
-        NonNativeTarget<Secp256K1Scalar>,
+        NonNativeTarget<Ed25519Scalar>,
+        NonNativeTarget<Ed25519Scalar>,
         BoolTarget,
         BoolTarget,
     ) {
-        let k1 = self.add_virtual_nonnative_target_sized::<Secp256K1Scalar>(4);
-        let k2 = self.add_virtual_nonnative_target_sized::<Secp256K1Scalar>(4);
+        let k1 = self.add_virtual_nonnative_target_sized::<Ed25519Scalar>(4);
+        let k2 = self.add_virtual_nonnative_target_sized::<Ed25519Scalar>(4);
         let k1_neg = self.add_virtual_bool_target();
         let k2_neg = self.add_virtual_bool_target();
 
@@ -80,14 +80,14 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderGlv<F, D>
 
     fn glv_mul(
         &mut self,
-        p: &AffinePointTarget<Secp256K1>,
-        k: &NonNativeTarget<Secp256K1Scalar>,
-    ) -> AffinePointTarget<Secp256K1> {
-        let (k1, k2, k1_neg, k2_neg) = self.decompose_secp256k1_scalar(k);
+        p: &AffinePointTarget<Ed25519>,
+        k: &NonNativeTarget<Ed25519Scalar>,
+    ) -> AffinePointTarget<Ed25519> {
+        let (k1, k2, k1_neg, k2_neg) = self.decompose_ed25519_scalar(k);
 
-        let beta = self.secp256k1_glv_beta();
+        let beta = self.ed25519_glv_beta();
         let beta_px = self.mul_nonnative(&beta, &p.x);
-        let sp = AffinePointTarget::<Secp256K1> {
+        let sp = AffinePointTarget::<Ed25519> {
             x: beta_px,
             y: p.y.clone(),
         };
@@ -100,9 +100,9 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderGlv<F, D>
 
 #[derive(Debug)]
 struct GLVDecompositionGenerator<F: RichField + Extendable<D>, const D: usize> {
-    k: NonNativeTarget<Secp256K1Scalar>,
-    k1: NonNativeTarget<Secp256K1Scalar>,
-    k2: NonNativeTarget<Secp256K1Scalar>,
+    k: NonNativeTarget<Ed25519Scalar>,
+    k1: NonNativeTarget<Ed25519Scalar>,
+    k2: NonNativeTarget<Ed25519Scalar>,
     k1_neg: BoolTarget,
     k2_neg: BoolTarget,
     _phantom: PhantomData<F>,
@@ -116,12 +116,12 @@ impl<F: RichField + Extendable<D>, const D: usize> SimpleGenerator<F>
     }
 
     fn run_once(&self, witness: &PartitionWitness<F>, out_buffer: &mut GeneratedValues<F>) {
-        let k = Secp256K1Scalar::from_biguint(witness_get_biguint_target(
+        let k = Ed25519Scalar::from_biguint(witness_get_biguint_target(
             witness,
             self.k.value.clone(),
         ));
 
-        let (k1, k2, k1_neg, k2_neg) = decompose_secp256k1_scalar(k);
+        let (k1, k2, k1_neg, k2_neg) = decompose_ed25519_scalar(k);
 
         buffer_set_biguint_target(out_buffer, &self.k1.value, &k1.to_canonical_biguint());
         buffer_set_biguint_target(out_buffer, &self.k2.value, &k2.to_canonical_biguint());
@@ -138,14 +138,14 @@ mod tests {
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
     use plonky2_field::field_types::Field;
-    use plonky2_field::secp256k1_scalar::Secp256K1Scalar;
 
     use crate::curve::curve_types::{Curve, CurveScalar};
     use crate::curve::glv::glv_mul;
-    use crate::curve::secp256k1::Secp256K1;
+    use crate::curve::ed25519::Ed25519;
     use crate::gadgets::curve::CircuitBuilderCurve;
     use crate::gadgets::glv::CircuitBuilderGlv;
     use crate::gadgets::nonnative::CircuitBuilderNonNative;
+    use crate::field::ed25519_scalar::Ed25519Scalar;
 
     #[test]
     #[ignore]
@@ -160,10 +160,10 @@ mod tests {
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
         let rando =
-            (CurveScalar(Secp256K1Scalar::rand()) * Secp256K1::GENERATOR_PROJECTIVE).to_affine();
+            (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
         let randot = builder.constant_affine_point(rando);
 
-        let scalar = Secp256K1Scalar::rand();
+        let scalar = Ed25519Scalar::rand();
         let scalar_target = builder.constant_nonnative(scalar);
 
         let rando_glv_scalar = glv_mul(rando.to_projective(), scalar);

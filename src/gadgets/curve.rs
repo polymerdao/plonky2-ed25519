@@ -262,13 +262,13 @@ mod tests {
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
     use plonky2_field::field_types::Field;
-    use plonky2_field::secp256k1_base::Secp256K1Base;
-    use plonky2_field::secp256k1_scalar::Secp256K1Scalar;
 
     use crate::curve::curve_types::{AffinePoint, Curve, CurveScalar};
-    use crate::curve::secp256k1::Secp256K1;
+    use crate::curve::ed25519::Ed25519;
     use crate::gadgets::curve::CircuitBuilderCurve;
     use crate::gadgets::nonnative::CircuitBuilderNonNative;
+    use crate::field::ed25519_base::Ed25519Base;
+    use crate::field::ed25519_scalar::Ed25519Scalar;
 
     #[test]
     fn test_curve_point_is_valid() -> Result<()> {
@@ -281,7 +281,7 @@ mod tests {
         let pw = PartialWitness::new();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        let g = Secp256K1::GENERATOR_AFFINE;
+        let g = Ed25519::GENERATOR_AFFINE;
         let g_target = builder.constant_affine_point(g);
         let neg_g_target = builder.curve_neg(&g_target);
 
@@ -306,10 +306,10 @@ mod tests {
         let pw = PartialWitness::new();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        let g = Secp256K1::GENERATOR_AFFINE;
-        let not_g = AffinePoint::<Secp256K1> {
+        let g = Ed25519::GENERATOR_AFFINE;
+        let not_g = AffinePoint::<Ed25519> {
             x: g.x,
-            y: g.y + Secp256K1Base::ONE,
+            y: g.y + Ed25519Base::ONE,
             zero: g.zero,
         };
         let not_g_target = builder.constant_affine_point(not_g);
@@ -333,7 +333,7 @@ mod tests {
         let pw = PartialWitness::new();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        let g = Secp256K1::GENERATOR_AFFINE;
+        let g = Ed25519::GENERATOR_AFFINE;
         let g_target = builder.constant_affine_point(g);
         let neg_g_target = builder.curve_neg(&g_target);
 
@@ -370,7 +370,7 @@ mod tests {
         let pw = PartialWitness::new();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        let g = Secp256K1::GENERATOR_AFFINE;
+        let g = Ed25519::GENERATOR_AFFINE;
         let double_g = g.double();
         let g_plus_2g = (g + double_g).to_affine();
         let g_plus_2g_expected = builder.constant_affine_point(g_plus_2g);
@@ -400,7 +400,7 @@ mod tests {
         let pw = PartialWitness::new();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        let g = Secp256K1::GENERATOR_AFFINE;
+        let g = Ed25519::GENERATOR_AFFINE;
         let double_g = g.double();
         let g_plus_2g = (g + double_g).to_affine();
         let g_plus_2g_expected = builder.constant_affine_point(g_plus_2g);
@@ -433,10 +433,10 @@ mod tests {
         let pw = PartialWitness::new();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        let g = Secp256K1::GENERATOR_PROJECTIVE.to_affine();
-        let five = Secp256K1Scalar::from_canonical_usize(5);
+        let g = Ed25519::GENERATOR_PROJECTIVE.to_affine();
+        let five = Ed25519Scalar::from_canonical_usize(5);
         let neg_five = five.neg();
-        let neg_five_scalar = CurveScalar::<Secp256K1>(neg_five);
+        let neg_five_scalar = CurveScalar::<Ed25519>(neg_five);
         let neg_five_g = (neg_five_scalar * g.to_projective()).to_affine();
         let neg_five_g_expected = builder.constant_affine_point(neg_five_g);
         builder.curve_assert_valid(&neg_five_g_expected);
@@ -467,10 +467,10 @@ mod tests {
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
         let rando =
-            (CurveScalar(Secp256K1Scalar::rand()) * Secp256K1::GENERATOR_PROJECTIVE).to_affine();
+            (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
         let randot = builder.constant_affine_point(rando);
 
-        let two_target = builder.constant_nonnative(Secp256K1Scalar::TWO);
+        let two_target = builder.constant_nonnative(Ed25519Scalar::TWO);
         let randot_doubled = builder.curve_double(&randot);
         let randot_times_two = builder.curve_scalar_mul(&randot, &two_target);
         builder.connect_affine_point(&randot_doubled, &randot_times_two);
