@@ -8,12 +8,19 @@ use crate::field::ed25519_scalar::Ed25519Scalar;
 #[derive(Debug, Copy, Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Ed25519;
 
+// Twisted Edwards curve -x^2 + y^2 = 1 + d*x^2*y^2, called "edwards25519", where:
+// p  2^255 - 19
+// d  37095705934669439343138083508754565189542113879843219016388785533085940283555
+// order  2^252 + 0x14def9dea2f79cd65812631a5cf5d3ed
+// cofactor  8
+// X(P)  15112221349535400772501151409588531511454012693041857206046113283949847762202
+// Y(P)  46316835694926478169428394003475163141307993866256225615783033603165251855960
 impl Curve for Ed25519 {
     type BaseField = Ed25519Base;
     type ScalarField = Ed25519Scalar;
 
     const A: Ed25519Base = Ed25519Base::ONE;
-    const B: Ed25519Base = Ed25519Base([
+    const D: Ed25519Base = Ed25519Base([
         0x75eb4dca135978a3,
         0x00700a4d4141d8ab,
         0x8cc740797779e898,
@@ -50,7 +57,6 @@ mod tests {
 
     use crate::curve::curve_types::{AffinePoint, Curve, ProjectivePoint};
     use crate::curve::ed25519::Ed25519;
-    use crate::field::ed25519_base::Ed25519Base;
     use crate::field::ed25519_scalar::Ed25519Scalar;
 
     #[test]

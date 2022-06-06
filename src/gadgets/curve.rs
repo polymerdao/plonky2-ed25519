@@ -98,16 +98,17 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderCurve<F, D>
         AffinePointTarget { x, y }
     }
 
+    // y^2 = a + x^2 + b*x^2*y^2
     fn curve_assert_valid<C: Curve>(&mut self, p: &AffinePointTarget<C>) {
         let a = self.constant_nonnative(C::A);
-        let b = self.constant_nonnative(C::B);
+        let d = self.constant_nonnative(C::D);
 
         let y_squared = self.mul_nonnative(&p.y, &p.y);
         let x_squared = self.mul_nonnative(&p.x, &p.x);
-        let x_cubed = self.mul_nonnative(&x_squared, &p.x);
-        let a_x = self.mul_nonnative(&a, &p.x);
-        let a_x_plus_b = self.add_nonnative(&a_x, &b);
-        let rhs = self.add_nonnative(&x_cubed, &a_x_plus_b);
+        let x_squared_y_squared = self.mul_nonnative(&x_squared, &y_squared);
+        let d_x_squared_y_squared = self.mul_nonnative(&d, &x_squared_y_squared);
+        let a_plus_x_squared = self.add_nonnative(&a, &x_squared);
+        let rhs = self.add_nonnative(&a_plus_x_squared, &d_x_squared_y_squared);
 
         self.connect_nonnative(&y_squared, &rhs);
     }

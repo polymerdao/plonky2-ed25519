@@ -16,7 +16,7 @@ pub trait Curve: 'static + Sync + Sized + Copy + Debug {
     type ScalarField: PrimeField;
 
     const A: Self::BaseField;
-    const B: Self::BaseField;
+    const D: Self::BaseField;
 
     const GENERATOR_AFFINE: AffinePoint<Self>;
 
@@ -32,7 +32,7 @@ pub trait Curve: 'static + Sync + Sized + Copy + Debug {
 
     fn is_safe_curve() -> bool {
         // Added additional check to prevent using vulnerabilties in case a discriminant is equal to 0.
-        (Self::A.cube().double().double() + Self::B.square().triple().triple().triple())
+        (Self::A.cube().double().double() + Self::D.square().triple().triple().triple())
             .is_nonzero()
     }
 }
@@ -60,7 +60,7 @@ impl<C: Curve> AffinePoint<C> {
 
     pub fn is_valid(&self) -> bool {
         let Self { x, y, zero } = *self;
-        zero || y.square() == x.cube() + C::A * x + C::B
+        zero || y.square() == x.square() + C::D * x.square() * y.square() + C::A
     }
 
     pub fn to_projective(&self) -> ProjectivePoint<C> {
@@ -156,7 +156,7 @@ impl<C: Curve> ProjectivePoint<C> {
 
     pub fn is_valid(&self) -> bool {
         let Self { x, y, z } = *self;
-        z.is_zero() || y.square() * z == x.cube() + C::A * x * z.square() + C::B * z.cube()
+        z.is_zero() || y.square() * z == x.cube() + C::A * x * z.square() + C::D * z.cube()
     }
 
     pub fn to_affine(&self) -> AffinePoint<C> {
