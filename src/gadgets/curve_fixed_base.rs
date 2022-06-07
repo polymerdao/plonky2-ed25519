@@ -43,7 +43,7 @@ pub fn fixed_base_curve_mul_circuit<C: Curve, F: RichField + Extendable<D>, cons
         let muls_point = (0..16)
             .scan(AffinePoint::ZERO, |acc, _| {
                 let tmp = *acc;
-                *acc = (point + *acc).to_affine();
+                *acc = point + *acc;
                 Some(tmp)
             })
             .map(|p| builder.constant_affine_point(p))

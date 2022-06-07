@@ -111,7 +111,7 @@ impl<C: Curve> Add<AffinePoint<C>> for ProjectivePoint<C> {
 }
 
 impl<C: Curve> Add<AffinePoint<C>> for AffinePoint<C> {
-    type Output = ProjectivePoint<C>;
+    type Output = AffinePoint<C>;
 
     fn add(self, rhs: AffinePoint<C>) -> Self::Output {
         let AffinePoint {
@@ -126,33 +126,41 @@ impl<C: Curve> Add<AffinePoint<C>> for AffinePoint<C> {
         } = rhs;
 
         if zero1 {
-            return rhs.to_projective();
+            return rhs;
         }
         if zero2 {
-            return self.to_projective();
+            return self;
         }
 
         // Check if we're doubling or adding inverses.
         if x1 == x2 {
             if y1 == y2 {
-                return self.to_projective().double();
+                return self.double();
             }
             if y1 == -y2 {
-                return ProjectivePoint::ZERO;
+                return AffinePoint::ZERO;
             }
         }
 
-        // From https://www.hyperelliptic.org/EFD/g1p/data/shortw/projective/addition/mmadd-1998-cmo
-        let u = y2 - y1;
-        let uu = u.square();
-        let v = x2 - x1;
-        let vv = v.square();
-        let vvv = v * vv;
-        let r = vv * x1;
-        let a = uu - vvv - r.double();
-        let x3 = v * a;
-        let y3 = u * (r - a) - vvv * y1;
-        let z3 = vvv;
-        ProjectivePoint::nonzero(x3, y3, z3)
+        let x1x2 = x1 * x2;
+        let y1y2 = y1 * y2;
+        let x1y2 = x1 * y2;
+        let y1x2 = y1 * x2;
+
+        let x1y2_add_y1x2 = x1y2 + y1x2;
+        let y1y2_add_x1x2 = y1y2 + x1x2;
+
+        let dx1x2y1y2 = C::D * x1x2 * y1y2;
+        let one_add_dx1x2y1y2 = C::BaseField::ONE + dx1x2y1y2;
+        let one_sub_dx1x2y1y2 = C::BaseField::ONE - dx1x2y1y2;
+
+        let x3 = x1y2_add_y1x2 / one_add_dx1x2y1y2;
+        let y3 = y1y2_add_x1x2 / one_sub_dx1x2y1y2;
+
+        Self {
+            x: x3,
+            y: y3,
+            zero: false,
+        }
     }
 }

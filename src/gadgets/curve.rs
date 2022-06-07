@@ -72,7 +72,7 @@ pub trait CircuitBuilderCurve<F: RichField + Extendable<D>, const D: usize> {
 }
 
 impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderCurve<F, D>
-    for CircuitBuilder<F, D>
+for CircuitBuilder<F, D>
 {
     fn constant_affine_point<C: Curve>(&mut self, point: AffinePoint<C>) -> AffinePointTarget<C> {
         debug_assert!(!point.zero);
@@ -132,26 +132,29 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderCurve<F, D>
         }
     }
 
+    // https://www.hyperelliptic.org/EFD/g1p/auto-twisted.html
     fn curve_double<C: Curve>(&mut self, p: &AffinePointTarget<C>) -> AffinePointTarget<C> {
         let AffinePointTarget { x, y } = p;
-        let double_y = self.add_nonnative(y, y);
-        let inv_double_y = self.inv_nonnative(&double_y);
-        let x_squared = self.mul_nonnative(x, x);
-        let double_x_squared = self.add_nonnative(&x_squared, &x_squared);
-        let triple_x_squared = self.add_nonnative(&double_x_squared, &x_squared);
+        let one = self.constant_nonnative(C::BaseField::ONE);
+        let d = self.constant_nonnative(C::D);
 
-        let a = self.constant_nonnative(C::A);
-        let triple_xx_a = self.add_nonnative(&triple_x_squared, &a);
-        let lambda = self.mul_nonnative(&triple_xx_a, &inv_double_y);
-        let lambda_squared = self.mul_nonnative(&lambda, &lambda);
-        let x_double = self.add_nonnative(x, x);
+        let xx = self.mul_nonnative(x, x);
+        let yy = self.mul_nonnative(y, y);
+        let xy = self.mul_nonnative(x, y);
 
-        let x3 = self.sub_nonnative(&lambda_squared, &x_double);
+        let xy_plus_xy = self.add_nonnative(&xy, &xy);
+        let xx_plus_yy = self.add_nonnative(&xx, &yy);
 
-        let x_diff = self.sub_nonnative(x, &x3);
-        let lambda_x_diff = self.mul_nonnative(&lambda, &x_diff);
+        let xxyy = self.mul_nonnative(&xx, &yy);
+        let dxxyy = self.mul_nonnative(&d, &xxyy);
+        let neg_dxxyy = self.neg_nonnative(&dxxyy);
+        let one_plus_dxxyy = self.add_nonnative(&one, &dxxyy);
+        let one_minus_dxxyy = self.add_nonnative(&one, &neg_dxxyy);
+        let inv_one_plus_dxxyy = self.inv_nonnative(&one_plus_dxxyy);
+        let inv_one_minus_dxxyy = self.inv_nonnative(&one_minus_dxxyy);
 
-        let y3 = self.sub_nonnative(&lambda_x_diff, y);
+        let x3 = self.mul_nonnative(&xy_plus_xy, &inv_one_plus_dxxyy);
+        let y3 = self.mul_nonnative(&xx_plus_yy, &inv_one_minus_dxxyy);
 
         AffinePointTarget { x: x3, y: y3 }
     }
@@ -170,6 +173,7 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderCurve<F, D>
         result
     }
 
+    // https://www.hyperelliptic.org/EFD/g1p/auto-twisted.html
     fn curve_add<C: Curve>(
         &mut self,
         p1: &AffinePointTarget<C>,
@@ -177,17 +181,27 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderCurve<F, D>
     ) -> AffinePointTarget<C> {
         let AffinePointTarget { x: x1, y: y1 } = p1;
         let AffinePointTarget { x: x2, y: y2 } = p2;
+        let one = self.constant_nonnative(C::BaseField::ONE);
+        let d = self.constant_nonnative(C::D);
 
-        let u = self.sub_nonnative(y2, y1);
-        let v = self.sub_nonnative(x2, x1);
-        let v_inv = self.inv_nonnative(&v);
-        let s = self.mul_nonnative(&u, &v_inv);
-        let s_squared = self.mul_nonnative(&s, &s);
-        let x_sum = self.add_nonnative(x2, x1);
-        let x3 = self.sub_nonnative(&s_squared, &x_sum);
-        let x_diff = self.sub_nonnative(x1, &x3);
-        let prod = self.mul_nonnative(&s, &x_diff);
-        let y3 = self.sub_nonnative(&prod, y1);
+        let x1y2 = self.mul_nonnative(x1, y2);
+        let y1x2 = self.mul_nonnative(y1, x2);
+        let y1y2 = self.mul_nonnative(y1, y2);
+        let x1x2 = self.mul_nonnative(x1, x2);
+
+        let x1y2_add_y1x2 = self.add_nonnative(&x1y2, &y1x2);
+        let y1y2_add_x1x2 = self.add_nonnative(&y1y2, &x1x2);
+
+        let x1x2y1y2 = self.mul_nonnative(&x1y2, &y1x2);
+        let dx1x2y1y2 = self.mul_nonnative(&d, &x1x2y1y2);
+        let neg_dx1x2y1y2 = self.neg_nonnative(&dx1x2y1y2);
+        let one_add_dx1x2y1y2 = self.add_nonnative(&one, &dx1x2y1y2);
+        let one_neg_dx1x2y1y2 = self.add_nonnative(&one, &neg_dx1x2y1y2);
+        let inv_one_add_dx1x2y1y2 = self.inv_nonnative(&one_add_dx1x2y1y2);
+        let inv_one_neg_dx1x2y1y2 = self.inv_nonnative(&one_neg_dx1x2y1y2);
+
+        let x3 = self.mul_nonnative(&x1y2_add_y1x2, &inv_one_add_dx1x2y1y2);
+        let y3 = self.mul_nonnative(&y1y2_add_x1x2, &inv_one_neg_dx1x2y1y2);
 
         AffinePointTarget { x: x3, y: y3 }
     }
@@ -373,7 +387,7 @@ mod tests {
 
         let g = Ed25519::GENERATOR_AFFINE;
         let double_g = g.double();
-        let g_plus_2g = (g + double_g).to_affine();
+        let g_plus_2g = g + double_g;
         let g_plus_2g_expected = builder.constant_affine_point(g_plus_2g);
         builder.curve_assert_valid(&g_plus_2g_expected);
 
@@ -403,7 +417,7 @@ mod tests {
 
         let g = Ed25519::GENERATOR_AFFINE;
         let double_g = g.double();
-        let g_plus_2g = (g + double_g).to_affine();
+        let g_plus_2g = g + double_g;
         let g_plus_2g_expected = builder.constant_affine_point(g_plus_2g);
 
         let g_expected = builder.constant_affine_point(g);

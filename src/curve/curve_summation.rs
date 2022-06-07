@@ -55,7 +55,7 @@ pub fn affine_summation_pairwise<C: Curve>(points: Vec<AffinePoint<C>>) -> Proje
     for chunk in points.chunks(2) {
         match chunk.len() {
             1 => reduced_points.push(chunk[0].to_projective()),
-            2 => reduced_points.push(chunk[0] + chunk[1]),
+            2 => reduced_points.push((chunk[0] + chunk[1]).to_projective()),
             _ => panic!(),
         }
     }
@@ -197,8 +197,8 @@ mod tests {
     #[test]
     fn test_pairwise_affine_summation() {
         let g_affine = Ed25519::GENERATOR_AFFINE;
-        let g2_affine = (g_affine + g_affine).to_affine();
-        let g3_affine = (g_affine + g_affine + g_affine).to_affine();
+        let g2_affine = g_affine + g_affine;
+        let g3_affine = g_affine + g_affine + g_affine;
         let g2_proj = g2_affine.to_projective();
         let g3_proj = g3_affine.to_projective();
         assert_eq!(

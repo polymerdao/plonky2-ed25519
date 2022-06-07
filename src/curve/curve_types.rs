@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 // see https://github.com/rust-lang/rust/issues/20400
 pub struct CurveScalar<C: Curve>(pub <C as Curve>::ScalarField);
 
-/// A short Weierstrass curve.
+/// A Twisted Edwards curve.
 pub trait Curve: 'static + Sync + Sized + Copy + Debug {
     type BaseField: PrimeField;
     type ScalarField: PrimeField;
@@ -37,7 +37,7 @@ pub trait Curve: 'static + Sync + Sized + Copy + Debug {
     }
 }
 
-/// A point on a short Weierstrass curve, represented in affine coordinates.
+/// A point on a Twisted Edwards curve, represented in affine coordinates.
 #[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 pub struct AffinePoint<C: Curve> {
     pub x: C::BaseField,
@@ -86,12 +86,19 @@ impl<C: Curve> AffinePoint<C> {
             return AffinePoint::ZERO;
         }
 
-        let double_y = y1.double();
-        let inv_double_y = double_y.inverse(); // (2y)^(-1)
-        let triple_xx = x1.square().triple(); // 3x^2
-        let lambda = (triple_xx + C::A) * inv_double_y;
-        let x3 = lambda.square() - self.x.double();
-        let y3 = lambda * (x1 - x3) - y1;
+        let x1_x1 = x1 * x1;
+        let x1_y1 = x1 * y1;
+        let y1_y1 = y1 * y1;
+
+        let x1_y1_plus_y1_x1 = x1_y1.double();
+        let x1_x1_plus_y1_y1 = x1_x1 + y1_y1;
+
+        let d_x1_x1_y1_y1 = C::D * x1_x1 * y1_y1;
+        let one_plus_d_x1_x1_y1_y1_plus_1 = C::BaseField::ONE + d_x1_x1_y1_y1;
+        let one_minus_d_x1_x1_y1_y1 = C::BaseField::ONE - d_x1_x1_y1_y1;
+
+        let x3 = x1_y1_plus_y1_x1 / one_plus_d_x1_x1_y1_y1_plus_1;
+        let y3 = x1_x1_plus_y1_y1 / one_minus_d_x1_x1_y1_y1;
 
         Self {
             x: x3,
@@ -133,7 +140,7 @@ impl<C: Curve> Hash for AffinePoint<C> {
     }
 }
 
-/// A point on a short Weierstrass curve, represented in projective coordinates.
+/// A point on a Twisted Edwards curve, represented in projective coordinates.
 #[derive(Copy, Clone, Debug)]
 pub struct ProjectivePoint<C: Curve> {
     pub x: C::BaseField,
