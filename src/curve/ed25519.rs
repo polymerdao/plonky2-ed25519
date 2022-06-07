@@ -66,8 +66,8 @@ mod tests {
         assert!(g.to_projective().is_valid());
 
         let neg_g = AffinePoint::<Ed25519> {
-            x: g.x,
-            y: -g.y,
+            x: -g.x,
+            y: g.y,
             zero: g.zero,
         };
         assert!(neg_g.is_valid());
@@ -108,10 +108,10 @@ mod tests {
                     sum = sum + g;
                 }
                 g = g.double();
-                assert!(g.to_affine().is_valid());
-                assert!(g.is_valid());
             }
         }
+        assert!(sum.to_affine().is_valid());
+        assert!(sum.is_valid());
         sum
     }
 }

@@ -54,7 +54,7 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderWindowedMul<F, 
         let g = (CurveScalar(C::ScalarField::rand()) * C::GENERATOR_PROJECTIVE).to_affine();
         let neg = {
             let mut neg = g;
-            neg.y = -neg.y;
+            neg.x = -neg.x;
             self.constant_affine_point(neg)
         };
 

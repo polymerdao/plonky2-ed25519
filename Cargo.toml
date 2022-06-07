@@ -16,3 +16,14 @@ rayon = "1.5.1"
 serde = { version = "1.0", features = ["derive"] }
 anyhow = "1.0.40"
 rand = "0.8.4"
+
+[profile.release]
+opt-level = 3
+#lto = "fat"
+#codegen-units = 1
+
+[profile.bench]
+opt-level = 3
+
+[profile.test]
+opt-level = 3

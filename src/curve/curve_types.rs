@@ -231,8 +231,8 @@ impl<C: Curve> ProjectivePoint<C> {
     #[must_use]
     pub fn neg(&self) -> Self {
         Self {
-            x: self.x,
-            y: -self.y,
+            x: -self.x,
+            y: self.y,
             z: self.z,
         }
     }
@@ -267,7 +267,7 @@ impl<C: Curve> Neg for AffinePoint<C> {
 
     fn neg(self) -> Self::Output {
         let AffinePoint { x, y, zero } = self;
-        AffinePoint { x, y: -y, zero }
+        AffinePoint { x: -x, y, zero }
     }
 }
 
@@ -276,7 +276,7 @@ impl<C: Curve> Neg for ProjectivePoint<C> {
 
     fn neg(self) -> Self::Output {
         let ProjectivePoint { x, y, z } = self;
-        ProjectivePoint { x, y: -y, z }
+        ProjectivePoint { x: -x, y, z }
     }
 }
 

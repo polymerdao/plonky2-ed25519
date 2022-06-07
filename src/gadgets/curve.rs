@@ -114,10 +114,10 @@ for CircuitBuilder<F, D>
     }
 
     fn curve_neg<C: Curve>(&mut self, p: &AffinePointTarget<C>) -> AffinePointTarget<C> {
-        let neg_y = self.neg_nonnative(&p.y);
+        let neg_x = self.neg_nonnative(&p.x);
         AffinePointTarget {
-            x: p.x.clone(),
-            y: neg_y,
+            x: neg_x,
+            y: p.y.clone(),
         }
     }
 
@@ -127,8 +127,8 @@ for CircuitBuilder<F, D>
         b: BoolTarget,
     ) -> AffinePointTarget<C> {
         AffinePointTarget {
-            x: p.x.clone(),
-            y: self.nonnative_conditional_neg(&p.y, b),
+            x: self.nonnative_conditional_neg(&p.x, b),
+            y: p.y.clone(),
         }
     }
 
@@ -481,8 +481,9 @@ mod tests {
         let pw = PartialWitness::new();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        let rando =
-            (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
+        let rando = Ed25519::GENERATOR_PROJECTIVE.to_affine();
+        //    (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
+        assert!(rando.is_valid());
         let randot = builder.constant_affine_point(rando);
 
         let two_target = builder.constant_nonnative(Ed25519Scalar::TWO);
