@@ -163,7 +163,7 @@ impl<C: Curve> ProjectivePoint<C> {
 
     pub fn is_valid(&self) -> bool {
         let Self { x, y, z } = *self;
-        z.is_zero() || y.square() * z == x.cube() + C::A * x * z.square() + C::D * z.cube()
+        z.is_zero() || y.square() * z.square() == x.square() * z.square() + z.square().square() + x.square() * y.square() * C::D
     }
 
     pub fn to_affine(&self) -> AffinePoint<C> {
@@ -194,7 +194,7 @@ impl<C: Curve> ProjectivePoint<C> {
         result
     }
 
-    // From https://www.hyperelliptic.org/EFD/g1p/data/shortw/projective/doubling/dbl-2007-bl
+    // https://www.hyperelliptic.org/EFD/g1p/auto-twisted-projective.html
     #[must_use]
     pub fn double(&self) -> Self {
         let Self { x, y, z } = *self;
@@ -202,20 +202,17 @@ impl<C: Curve> ProjectivePoint<C> {
             return ProjectivePoint::ZERO;
         }
 
-        let xx = x.square();
-        let zz = z.square();
-        let mut w = xx.triple();
-        if C::A.is_nonzero() {
-            w += C::A * zz;
-        }
-        let s = y.double() * z;
-        let r = y * s;
-        let rr = r.square();
-        let b = (x + r).square() - (xx + rr);
-        let h = w.square() - b.double();
-        let x3 = h * s;
-        let y3 = w * (b - h) - rr.double();
-        let z3 = s.cube();
+        let b = (x + y).square();
+        let c = x.square();
+        let d = y.square();
+        let e = c.neg();
+        let f = e + d;
+        let h = z.square();
+        let j = f - C::BaseField::TWO * h;
+        let x3 = (b - c - d) * j;
+        let y3 = f * (e - d);
+        let z3 = f * j;
+
         Self {
             x: x3,
             y: y3,

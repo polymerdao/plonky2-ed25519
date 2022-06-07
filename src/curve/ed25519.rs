@@ -63,6 +63,7 @@ mod tests {
     fn test_generator() {
         let g = Ed25519::GENERATOR_AFFINE;
         assert!(g.is_valid());
+        assert!(g.to_projective().is_valid());
 
         let neg_g = AffinePoint::<Ed25519> {
             x: g.x,
@@ -70,6 +71,7 @@ mod tests {
             zero: g.zero,
         };
         assert!(neg_g.is_valid());
+        assert!(neg_g.to_projective().is_valid());
     }
 
     #[test]
@@ -106,6 +108,8 @@ mod tests {
                     sum = sum + g;
                 }
                 g = g.double();
+                assert!(g.to_affine().is_valid());
+                assert!(g.is_valid());
             }
         }
         sum

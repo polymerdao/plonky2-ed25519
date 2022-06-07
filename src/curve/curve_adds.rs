@@ -8,6 +8,7 @@ use crate::curve::curve_types::{AffinePoint, Curve, ProjectivePoint};
 impl<C: Curve> Add<ProjectivePoint<C>> for ProjectivePoint<C> {
     type Output = ProjectivePoint<C>;
 
+    // https://www.hyperelliptic.org/EFD/g1p/auto-twisted-projective.html
     fn add(self, rhs: ProjectivePoint<C>) -> Self::Output {
         let ProjectivePoint {
             x: x1,
@@ -43,18 +44,18 @@ impl<C: Curve> Add<ProjectivePoint<C>> for ProjectivePoint<C> {
             }
         }
 
-        // From https://www.hyperelliptic.org/EFD/g1p/data/shortw/projective/addition/add-1998-cmo-2
-        let z1z2 = z1 * z2;
-        let u = y2z1 - y1z2;
-        let uu = u.square();
-        let v = x2z1 - x1z2;
-        let vv = v.square();
-        let vvv = v * vv;
-        let r = vv * x1z2;
-        let a = uu * z1z2 - vvv - r.double();
-        let x3 = v * a;
-        let y3 = u * (r - a) - vvv * y1z2;
-        let z3 = vvv * z1z2;
+        // From https://www.hyperelliptic.org/EFD/g1p/auto-twisted-projective.html
+        let a = z1 * z2;
+        let b = a.square();
+        let c = x1 * x2;
+        let d = y1 * y2;
+        let e = C::D * (c * d);
+        let f = b - e;
+        let g = b + e;
+        let x3 = a * f * ((x1 + y1) * (x2 + y2) - c - d);
+        let y3 = a * g * (d + c);
+        let z3 = f * g;
+
         ProjectivePoint::nonzero(x3, y3, z3)
     }
 }
