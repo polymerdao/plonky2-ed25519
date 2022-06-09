@@ -1,6 +1,7 @@
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
 
+use log::{Level, LevelFilter};
 use anyhow::Result;
 use plonky2::{
     iop::witness::PartialWitness,
@@ -9,6 +10,7 @@ use plonky2::{
         circuit_data::CircuitConfig,
         config::{GenericConfig, PoseidonGoldilocksConfig},
     },
+    util::timing::TimingTree,
 };
 use plonky2_ed25519::curve::curve_types::AffinePoint;
 use plonky2_ed25519::field::ed25519_base::Ed25519Base;
@@ -19,12 +21,8 @@ use plonky2_ed25519::curve::eddsa::EDDSASignature;
 use plonky2_ed25519::gadgets::curve::CircuitBuilderCurve;
 use plonky2_ed25519::gadgets::nonnative::CircuitBuilderNonNative;
 use plonky2_ed25519::gadgets::eddsa::EDDSAPublicKeyTarget;
-use std::time::Instant;
 
 fn benchmark() -> Result<()> {
-    println!("Start timing");
-    let now = Instant::now();
-
     const D: usize = 2;
     type C = PoseidonGoldilocksConfig;
     type F = <C as GenericConfig<D>>::F;
@@ -83,25 +81,24 @@ fn benchmark() -> Result<()> {
     println!("Constructing inner proof with {} gates", builder.num_gates());
     let data = builder.build::<C>();
 
-    let elapsed = now.elapsed();
-    println!("Building time: {:.2?}", elapsed);
-    let now = Instant::now();
-
+    let timing = TimingTree::new("prove", Level::Debug);
     let proof = data.prove(pw).unwrap();
+    timing.print();
 
-    let elapsed = now.elapsed();
-    println!("Proving time: {:.2?}", elapsed);
-    let now = Instant::now();
-
+    let timing = TimingTree::new("verify", Level::Debug);
     let ok = data.verify(proof);
-
-    let elapsed = now.elapsed();
-    println!("Verifying time: {:.2?}", elapsed);
+    timing.print();
 
     ok
 }
 
 fn main() -> Result<()> {
+    // Initialize logging
+    let mut builder = env_logger::Builder::from_default_env();
+    builder.format_timestamp(None);
+    builder.filter_level(LevelFilter::Trace);
+    builder.try_init()?;
+
     // Run the benchmark
     benchmark()
 }
