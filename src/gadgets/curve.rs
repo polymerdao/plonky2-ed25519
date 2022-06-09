@@ -481,8 +481,7 @@ mod tests {
         let pw = PartialWitness::new();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        let rando = Ed25519::GENERATOR_PROJECTIVE.to_affine();
-        //    (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
+        let rando = (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
         assert!(rando.is_valid());
         let randot = builder.constant_affine_point(rando);
 

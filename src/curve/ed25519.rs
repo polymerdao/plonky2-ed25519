@@ -1,7 +1,8 @@
 use plonky2_field::field_types::Field;
 use serde::{Deserialize, Serialize};
 
-use crate::curve::curve_types::{AffinePoint, Curve};
+use plonky2_field::field_types::PrimeField;
+use crate::curve::curve_types::{AffinePoint, Curve, ProjectivePoint};
 use crate::field::ed25519_base::Ed25519Base;
 use crate::field::ed25519_scalar::Ed25519Scalar;
 
@@ -49,15 +50,36 @@ const ED25519_GENERATOR_Y: Ed25519Base = Ed25519Base([
     0x6666666666666666,
 ]);
 
+/// A simple, somewhat inefficient implementation of multiplication which is used as a reference
+/// for correctness.
+pub(crate) fn mul_naive(
+    lhs: Ed25519Scalar,
+    rhs: ProjectivePoint<Ed25519>,
+) -> ProjectivePoint<Ed25519> {
+    let mut g = rhs;
+    let mut sum = ProjectivePoint::ZERO;
+    for limb in lhs.to_canonical_biguint().to_u64_digits().iter() {
+        for j in 0..64 {
+            if (limb >> j & 1u64) != 0u64 {
+                sum = sum + g;
+            }
+            g = g.double();
+        }
+    }
+    assert!(sum.to_affine().is_valid());
+    assert!(sum.is_valid());
+    sum
+}
+
 #[cfg(test)]
 mod tests {
     use num::BigUint;
     use plonky2_field::field_types::Field;
-    use plonky2_field::field_types::PrimeField;
 
-    use crate::curve::curve_types::{AffinePoint, Curve, ProjectivePoint};
+    use crate::curve::curve_types::{AffinePoint, Curve};
     use crate::curve::ed25519::Ed25519;
     use crate::field::ed25519_scalar::Ed25519Scalar;
+    use crate::curve::ed25519::mul_naive;
 
     #[test]
     fn test_generator() {
@@ -92,26 +114,5 @@ mod tests {
             Ed25519::convert(lhs) * Ed25519::GENERATOR_PROJECTIVE,
             mul_naive(lhs, Ed25519::GENERATOR_PROJECTIVE)
         );
-    }
-
-    /// A simple, somewhat inefficient implementation of multiplication which is used as a reference
-    /// for correctness.
-    fn mul_naive(
-        lhs: Ed25519Scalar,
-        rhs: ProjectivePoint<Ed25519>,
-    ) -> ProjectivePoint<Ed25519> {
-        let mut g = rhs;
-        let mut sum = ProjectivePoint::ZERO;
-        for limb in lhs.to_canonical_biguint().to_u64_digits().iter() {
-            for j in 0..64 {
-                if (limb >> j & 1u64) != 0u64 {
-                    sum = sum + g;
-                }
-                g = g.double();
-            }
-        }
-        assert!(sum.to_affine().is_valid());
-        assert!(sum.is_valid());
-        sum
     }
 }
