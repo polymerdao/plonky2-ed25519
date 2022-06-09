@@ -9,7 +9,7 @@ use crate::gadgets::nonnative::{NonNativeTarget};
 use crate::field::ed25519_scalar::Ed25519Scalar;
 
 #[derive(Clone, Debug)]
-pub struct EDDSAPublicKeyTarget<C: Curve>(AffinePointTarget<C>);
+pub struct EDDSAPublicKeyTarget<C: Curve>(pub AffinePointTarget<C>);
 
 #[derive(Clone, Debug)]
 pub struct EDDSASignatureTarget<C: Curve> {
