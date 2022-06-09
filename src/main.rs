@@ -1,10 +1,7 @@
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
 
-use std::{num::ParseIntError, ops::RangeInclusive, str::FromStr};
-
-use anyhow::{Context as _, Result};
-use log::{info, LevelFilter};
+use anyhow::Result;
 use plonky2::{
     iop::witness::PartialWitness,
     plonk::{
@@ -13,7 +10,6 @@ use plonky2::{
         config::{GenericConfig, PoseidonGoldilocksConfig},
     },
 };
-use structopt::StructOpt;
 use plonky2_ed25519::curve::curve_types::AffinePoint;
 use plonky2_ed25519::field::ed25519_base::Ed25519Base;
 use plonky2_ed25519::field::ed25519_scalar::Ed25519Scalar;
@@ -23,26 +19,11 @@ use plonky2_ed25519::curve::eddsa::EDDSASignature;
 use plonky2_ed25519::gadgets::curve::CircuitBuilderCurve;
 use plonky2_ed25519::gadgets::nonnative::CircuitBuilderNonNative;
 use plonky2_ed25519::gadgets::eddsa::EDDSAPublicKeyTarget;
-
-#[derive(Clone, StructOpt, Debug)]
-#[structopt(name = "bench_recursion")]
-struct Options {
-    /// Verbose mode (-v, -vv, -vvv, etc.)
-    #[structopt(short, long, parse(from_occurrences))]
-    verbose: usize,
-
-    /// Apply an env_filter compatible log filter
-    #[structopt(long, env, default_value)]
-    log_filter: String,
-
-    /// Number of compute threads to use. Defaults to number of cores. Can be a single
-    /// value or a rust style range.
-    #[structopt(long, parse(try_from_str = parse_range_usize))]
-    threads: Option<RangeInclusive<usize>>,
-}
+use std::time::Instant;
 
 fn benchmark() -> Result<()> {
-    println!("Run benchmark()");
+    println!("Start timing");
+    let now = Instant::now();
 
     const D: usize = 2;
     type C = PoseidonGoldilocksConfig;
@@ -99,68 +80,28 @@ fn benchmark() -> Result<()> {
 
     verify_message_circuit(&mut builder, msg_target, sig_target, pk_target);
 
-    info!("Constructing inner proof with {} gates", builder.num_gates());
+    println!("Constructing inner proof with {} gates", builder.num_gates());
     let data = builder.build::<C>();
+
+    let elapsed = now.elapsed();
+    println!("Building time: {:.2?}", elapsed);
+    let now = Instant::now();
+
     let proof = data.prove(pw).unwrap();
-    data.verify(proof)
+
+    let elapsed = now.elapsed();
+    println!("Proving time: {:.2?}", elapsed);
+    let now = Instant::now();
+
+    let ok = data.verify(proof);
+
+    let elapsed = now.elapsed();
+    println!("Verifying time: {:.2?}", elapsed);
+
+    ok
 }
 
 fn main() -> Result<()> {
-    // Parse command line arguments, see `--help` for details.
-    let options = Options::from_args_safe()?;
-
-    // Initialize logging
-    let mut builder = env_logger::Builder::from_default_env();
-    builder.parse_filters(&options.log_filter);
-    builder.format_timestamp(None);
-    match options.verbose {
-        0 => &mut builder,
-        1 => builder.filter_level(LevelFilter::Info),
-        2 => builder.filter_level(LevelFilter::Debug),
-        _ => builder.filter_level(LevelFilter::Trace),
-    };
-    builder.try_init()?;
-
-    let num_cpus = num_cpus::get();
-    let threads = options.threads.unwrap_or(num_cpus..=num_cpus);
-
-    // Since the `size` is most likely to be and unbounded range we make that the outer iterator.
-    for threads in threads.clone() {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(threads)
-            .build()
-            .context("Failed to build thread pool.")?
-            .install(|| {
-                info!(
-                        "Using {} compute threads on {} cores",
-                        rayon::current_num_threads(),
-                        num_cpus
-                    );
-                // Run the benchmark
-                benchmark()
-            })?;
-    }
-
-    Ok(())
-}
-
-fn parse_range_usize(src: &str) -> Result<RangeInclusive<usize>, ParseIntError> {
-    if let Some((left, right)) = src.split_once("..=") {
-        Ok(RangeInclusive::new(
-            usize::from_str(left)?,
-            usize::from_str(right)?,
-        ))
-    } else if let Some((left, right)) = src.split_once("..") {
-        Ok(RangeInclusive::new(
-            usize::from_str(left)?,
-            if right.is_empty() {
-                usize::MAX
-            } else {
-                usize::from_str(right)?.saturating_sub(1)
-            },
-        ))
-    } else {
-        let value = usize::from_str(src)?;
-        Ok(RangeInclusive::new(value, value))
-    }
+    // Run the benchmark
+    benchmark()
 }
