@@ -24,6 +24,14 @@ pub const SAMPLE_H1: Ed25519Scalar = Ed25519Scalar([
     0x0ab087fb4e3439bd
 ]);
 
+// "plonky2"
+pub const SAMPLE_H2: Ed25519Scalar = Ed25519Scalar([
+    0x143b2cc9c13f8696,
+    0x2a8ccb64b8a95963,
+    0x94c5b08bb85433d1,
+    0x02c2c41397871be1
+]);
+
 // "test message"
 pub const SAMPLE_SIG1: EDDSASignature<Ed25519> = EDDSASignature {
     r: AffinePoint {
@@ -40,6 +48,25 @@ pub const SAMPLE_SIG1: EDDSASignature<Ed25519> = EDDSASignature {
         0x6653c3fd197a19b9,
         0xb84df96c151efff0,
         0x08440c31c6094824,
+    ]),
+};
+
+// "plonky2"
+pub const SAMPLE_SIG2: EDDSASignature<Ed25519> = EDDSASignature {
+    r: AffinePoint {
+        x: Ed25519Base(
+            [18097384930714120284, 642567881465359456, 16199477785500488968, 7453747616827279566]
+        ),
+        y: Ed25519Base(
+            [13170736121933222530, 13035060597819315010, 8090097167443890987, 6195233289729896875]
+        ),
+        zero: false,
+    },
+    s: Ed25519Scalar([
+        0x0ac9c0473f91d839,
+        0x65e2f03f08cbea36,
+        0x341f2399f624a754,
+        0x07863e1289ef52f4,
     ]),
 };
 
@@ -68,11 +95,13 @@ pub fn verify_message(
 
 #[cfg(test)]
 mod tests {
-    use crate::curve::eddsa::{SAMPLE_H1, SAMPLE_PK1, SAMPLE_SIG1, verify_message};
+    use crate::curve::eddsa::{SAMPLE_H1, SAMPLE_H2, SAMPLE_PK1, SAMPLE_SIG1, SAMPLE_SIG2, verify_message};
 
     #[test]
     fn test_ecdsa_native() {
         let result = verify_message(SAMPLE_H1, SAMPLE_SIG1, SAMPLE_PK1);
+        assert!(result);
+        let result = verify_message(SAMPLE_H2, SAMPLE_SIG2, SAMPLE_PK1);
         assert!(result);
     }
 }
