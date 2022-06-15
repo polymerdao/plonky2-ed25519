@@ -15,7 +15,7 @@ use plonky2::util::timing::TimingTree;
 use plonky2_ed25519::gadgets::eddsa::verify_message_circuit;
 use plonky2_ed25519::gadgets::eddsa::EDDSASignatureTarget;
 use plonky2_ed25519::gadgets::curve::CircuitBuilderCurve;
-use plonky2_ed25519::gadgets::nonnative::CircuitBuilderNonNative;
+use plonky2_ed25519::gadgets::nonnative::{CircuitBuilderNonNative, NonNativeTarget};
 use plonky2_ed25519::gadgets::eddsa::EDDSAPublicKeyTarget;
 use plonky2_ed25519::curve::eddsa::EDDSASignature;
 use plonky2_ed25519::curve::eddsa::{SAMPLE_H1, SAMPLE_H2, SAMPLE_PK1, SAMPLE_SIG1, SAMPLE_SIG2};
@@ -23,12 +23,58 @@ use plonky2_ed25519::curve::ed25519::Ed25519;
 use plonky2_ed25519::curve::curve_types::AffinePoint;
 use plonky2_ed25519::field::ed25519_scalar::Ed25519Scalar;
 use plonky2_field::extension_field::Extendable;
+use plonky2_field::field_types::PrimeField;
+use plonky2_ed25519::gadgets::biguint::witness_set_biguint_target;
 
 type ProofTuple<F, C, const D: usize> = (
     ProofWithPublicInputs<F, C, D>,
     VerifierOnlyCircuitData<C, D>,
     CommonCircuitData<F, C, D>,
 );
+
+struct Ed25519Targets {
+    msg_target: NonNativeTarget<Ed25519Scalar>,
+    pk_target: EDDSAPublicKeyTarget<Ed25519>,
+    sig_target: EDDSASignatureTarget<Ed25519>,
+}
+
+fn make_circuits<F: RichField + Extendable<D>, const D: usize>(
+    builder: &mut CircuitBuilder<F, D>,
+) -> Ed25519Targets {
+    let msg_target = builder.add_virtual_nonnative_target();
+    let pk_target = EDDSAPublicKeyTarget(builder.add_virtual_affine_point_target());
+    let sig_target = EDDSASignatureTarget {
+        r: builder.add_virtual_affine_point_target(),
+        s: builder.add_virtual_nonnative_target(),
+    };
+
+    verify_message_circuit(builder, &msg_target, &sig_target, &pk_target);
+
+    Ed25519Targets {
+        msg_target,
+        pk_target,
+        sig_target,
+    }
+}
+
+fn fill_circuits<F: RichField + Extendable<D>, const D: usize>(
+    pw: &mut PartialWitness<F>,
+    h: Ed25519Scalar,
+    sig: EDDSASignature<Ed25519>,
+    pk: AffinePoint<Ed25519>,
+    targets: &Ed25519Targets,
+) {
+    let Ed25519Targets {
+        msg_target, pk_target, sig_target
+    } = targets;
+
+    witness_set_biguint_target(pw, &msg_target.value, &h.to_canonical_biguint());
+    witness_set_biguint_target(pw, &pk_target.0.x.value, &pk.x.to_canonical_biguint());
+    witness_set_biguint_target(pw, &pk_target.0.y.value, &pk.y.to_canonical_biguint());
+    witness_set_biguint_target(pw, &sig_target.s.value, &sig.s.to_canonical_biguint());
+    witness_set_biguint_target(pw, &sig_target.r.x.value, &sig.r.x.to_canonical_biguint());
+    witness_set_biguint_target(pw, &sig_target.r.y.value, &sig.r.y.to_canonical_biguint());
+}
 
 fn prove_ed25519<F: RichField + Extendable<D>, C: GenericConfig<D, F=F>, const D: usize>(
     h: Ed25519Scalar,
@@ -37,17 +83,11 @@ fn prove_ed25519<F: RichField + Extendable<D>, C: GenericConfig<D, F=F>, const D
     -> Result<ProofTuple<F, C, D>>
     where
         [(); C::Hasher::HASH_SIZE]:, {
-    let pw = PartialWitness::new();
     let mut builder = CircuitBuilder::<F, D>::new(CircuitConfig::wide_ecc_config());
 
-    let msg_target = builder.constant_nonnative(h);
-    let pk_target = EDDSAPublicKeyTarget(builder.constant_affine_point(pk));
-    let sig_target = EDDSASignatureTarget {
-        r: builder.constant_affine_point(sig.r),
-        s: builder.constant_nonnative(sig.s),
-    };
-
-    verify_message_circuit(&mut builder, msg_target, sig_target, pk_target);
+    let targets = make_circuits(&mut builder);
+    let mut pw = PartialWitness::new();
+    fill_circuits::<F, D>(&mut pw, h, sig, pk, &targets);
 
     println!("Constructing inner proof with {} gates", builder.num_gates());
     let data = builder.build::<C>();

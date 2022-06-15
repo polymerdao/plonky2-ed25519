@@ -19,9 +19,9 @@ pub struct EDDSASignatureTarget<C: Curve> {
 
 pub fn verify_message_circuit<F: RichField + Extendable<D>, const D: usize>(
     builder: &mut CircuitBuilder<F, D>,
-    h: NonNativeTarget<Ed25519Scalar>,
-    sig: EDDSASignatureTarget<Ed25519>,
-    pk: EDDSAPublicKeyTarget<Ed25519>,
+    h: &NonNativeTarget<Ed25519Scalar>,
+    sig: &EDDSASignatureTarget<Ed25519>,
+    pk: &EDDSAPublicKeyTarget<Ed25519>,
 ) {
     let EDDSASignatureTarget { r, s } = sig;
 
@@ -68,7 +68,7 @@ mod tests {
             s: s_target,
         };
 
-        verify_message_circuit(&mut builder, msg_target, sig_target, pk_target);
+        verify_message_circuit(&mut builder, &msg_target, &sig_target, &pk_target);
 
         dbg!(builder.num_gates());
         let data = builder.build::<C>();
