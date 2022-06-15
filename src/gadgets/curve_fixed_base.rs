@@ -71,11 +71,11 @@ mod tests {
 
     use crate::curve::curve_types::{Curve, CurveScalar};
     use crate::curve::ed25519::Ed25519;
+    use crate::field::ed25519_scalar::Ed25519Scalar;
     use crate::gadgets::biguint::witness_set_biguint_target;
     use crate::gadgets::curve::CircuitBuilderCurve;
     use crate::gadgets::curve_fixed_base::fixed_base_curve_mul_circuit;
     use crate::gadgets::nonnative::CircuitBuilderNonNative;
-    use crate::field::ed25519_scalar::Ed25519Scalar;
 
     #[test]
     #[ignore]

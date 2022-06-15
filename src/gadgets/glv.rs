@@ -8,14 +8,14 @@ use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2_field::extension_field::Extendable;
 use plonky2_field::field_types::{Field, PrimeField};
 
-use crate::curve::glv::{decompose_ed25519_scalar, GLV_BETA, GLV_S};
 use crate::curve::ed25519::Ed25519;
+use crate::curve::glv::{decompose_ed25519_scalar, GLV_BETA, GLV_S};
+use crate::field::ed25519_base::Ed25519Base;
+use crate::field::ed25519_scalar::Ed25519Scalar;
 use crate::gadgets::biguint::{buffer_set_biguint_target, witness_get_biguint_target};
 use crate::gadgets::curve::{AffinePointTarget, CircuitBuilderCurve};
 use crate::gadgets::curve_msm::curve_msm_circuit;
 use crate::gadgets::nonnative::{CircuitBuilderNonNative, NonNativeTarget};
-use crate::field::ed25519_base::Ed25519Base;
-use crate::field::ed25519_scalar::Ed25519Scalar;
 
 pub trait CircuitBuilderGlv<F: RichField + Extendable<D>, const D: usize> {
     fn ed25519_glv_beta(&mut self) -> NonNativeTarget<Ed25519Base>;
@@ -116,10 +116,8 @@ impl<F: RichField + Extendable<D>, const D: usize> SimpleGenerator<F>
     }
 
     fn run_once(&self, witness: &PartitionWitness<F>, out_buffer: &mut GeneratedValues<F>) {
-        let k = Ed25519Scalar::from_biguint(witness_get_biguint_target(
-            witness,
-            self.k.value.clone(),
-        ));
+        let k =
+            Ed25519Scalar::from_biguint(witness_get_biguint_target(witness, self.k.value.clone()));
 
         let (k1, k2, k1_neg, k2_neg) = decompose_ed25519_scalar(k);
 
@@ -140,12 +138,12 @@ mod tests {
     use plonky2_field::field_types::Field;
 
     use crate::curve::curve_types::{Curve, CurveScalar};
-    use crate::curve::glv::glv_mul;
     use crate::curve::ed25519::Ed25519;
+    use crate::curve::glv::glv_mul;
+    use crate::field::ed25519_scalar::Ed25519Scalar;
     use crate::gadgets::curve::CircuitBuilderCurve;
     use crate::gadgets::glv::CircuitBuilderGlv;
     use crate::gadgets::nonnative::CircuitBuilderNonNative;
-    use crate::field::ed25519_scalar::Ed25519Scalar;
 
     #[test]
     #[ignore]

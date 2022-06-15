@@ -181,7 +181,7 @@ impl AddAssign for Ed25519Scalar {
 }
 
 impl Sum for Ed25519Scalar {
-    fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(Self::ZERO, |acc, x| acc + x)
     }
 }
@@ -223,7 +223,7 @@ impl MulAssign for Ed25519Scalar {
 
 impl Product for Ed25519Scalar {
     #[inline]
-    fn product<I: Iterator<Item=Self>>(iter: I) -> Self {
+    fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.reduce(|acc, x| acc * x).unwrap_or(Self::ONE)
     }
 }

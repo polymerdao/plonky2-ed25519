@@ -117,7 +117,7 @@ pub trait CircuitBuilderNonNative<F: RichField + Extendable<D>, const D: usize> 
 }
 
 impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderNonNative<F, D>
-for CircuitBuilder<F, D>
+    for CircuitBuilder<F, D>
 {
     fn num_nonnative_limbs<FF: Field>() -> usize {
         ceil_div_usize(FF::BITS, 32)
@@ -453,7 +453,7 @@ struct NonNativeAdditionGenerator<F: RichField + Extendable<D>, const D: usize, 
 }
 
 impl<F: RichField + Extendable<D>, const D: usize, FF: PrimeField> SimpleGenerator<F>
-for NonNativeAdditionGenerator<F, D, FF>
+    for NonNativeAdditionGenerator<F, D, FF>
 {
     fn dependencies(&self) -> Vec<Target> {
         self.a
@@ -494,7 +494,7 @@ struct NonNativeMultipleAddsGenerator<F: RichField + Extendable<D>, const D: usi
 }
 
 impl<F: RichField + Extendable<D>, const D: usize, FF: PrimeField> SimpleGenerator<F>
-for NonNativeMultipleAddsGenerator<F, D, FF>
+    for NonNativeMultipleAddsGenerator<F, D, FF>
 {
     fn dependencies(&self) -> Vec<Target> {
         self.summands
@@ -539,7 +539,7 @@ struct NonNativeSubtractionGenerator<F: RichField + Extendable<D>, const D: usiz
 }
 
 impl<F: RichField + Extendable<D>, const D: usize, FF: PrimeField> SimpleGenerator<F>
-for NonNativeSubtractionGenerator<F, D, FF>
+    for NonNativeSubtractionGenerator<F, D, FF>
 {
     fn dependencies(&self) -> Vec<Target> {
         self.a
@@ -580,7 +580,7 @@ struct NonNativeMultiplicationGenerator<F: RichField + Extendable<D>, const D: u
 }
 
 impl<F: RichField + Extendable<D>, const D: usize, FF: PrimeField> SimpleGenerator<F>
-for NonNativeMultiplicationGenerator<F, D, FF>
+    for NonNativeMultiplicationGenerator<F, D, FF>
 {
     fn dependencies(&self) -> Vec<Target> {
         self.a
@@ -618,7 +618,7 @@ struct NonNativeInverseGenerator<F: RichField + Extendable<D>, const D: usize, F
 }
 
 impl<F: RichField + Extendable<D>, const D: usize, FF: PrimeField> SimpleGenerator<F>
-for NonNativeInverseGenerator<F, D, FF>
+    for NonNativeInverseGenerator<F, D, FF>
 {
     fn dependencies(&self) -> Vec<Target> {
         self.x.value.limbs.iter().map(|&l| l.0).collect()
@@ -648,8 +648,8 @@ mod tests {
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
     use plonky2_field::field_types::{Field, PrimeField};
 
-    use crate::gadgets::nonnative::CircuitBuilderNonNative;
     use crate::field::ed25519_base::Ed25519Base;
+    use crate::gadgets::nonnative::CircuitBuilderNonNative;
 
     #[test]
     fn test_nonnative_add() -> Result<()> {

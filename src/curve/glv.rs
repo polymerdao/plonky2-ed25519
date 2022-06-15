@@ -24,8 +24,7 @@ pub const GLV_S: Ed25519Scalar = Ed25519Scalar([
 
 const A1: Ed25519Scalar = Ed25519Scalar([16747920425669159701, 3496713202691238861, 0, 0]);
 
-const MINUS_B1: Ed25519Scalar =
-    Ed25519Scalar([8022177200260244675, 16448129721693014056, 0, 0]);
+const MINUS_B1: Ed25519Scalar = Ed25519Scalar([8022177200260244675, 16448129721693014056, 0, 0]);
 
 const A2: Ed25519Scalar = Ed25519Scalar([6323353552219852760, 1498098850674701302, 1, 0]);
 
@@ -35,9 +34,7 @@ const B2: Ed25519Scalar = Ed25519Scalar([16747920425669159701, 34967132026912388
 /// Decompose a scalar `k` into two small scalars `k1, k2` with `|k1|, |k2| < √p` that satisfy
 /// `k1 + s * k2 = k`.
 /// Returns `(|k1|, |k2|, k1 < 0, k2 < 0)`.
-pub fn decompose_ed25519_scalar(
-    k: Ed25519Scalar,
-) -> (Ed25519Scalar, Ed25519Scalar, bool, bool) {
+pub fn decompose_ed25519_scalar(k: Ed25519Scalar) -> (Ed25519Scalar, Ed25519Scalar, bool, bool) {
     let p = Ed25519Scalar::order();
     let c1_biguint = Ratio::new(
         B2.to_canonical_biguint() * k.to_canonical_biguint(),
@@ -105,8 +102,8 @@ mod tests {
     use plonky2_field::field_types::Field;
 
     use crate::curve::curve_types::{Curve, CurveScalar};
-    use crate::curve::glv::{decompose_ed25519_scalar, glv_mul, GLV_S};
     use crate::curve::ed25519::Ed25519;
+    use crate::curve::glv::{decompose_ed25519_scalar, glv_mul, GLV_S};
     use crate::field::ed25519_scalar::Ed25519Scalar;
 
     #[test]

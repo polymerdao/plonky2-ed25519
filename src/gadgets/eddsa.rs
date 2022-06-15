@@ -4,9 +4,9 @@ use plonky2_field::extension_field::Extendable;
 
 use crate::curve::curve_types::Curve;
 use crate::curve::ed25519::Ed25519;
+use crate::field::ed25519_scalar::Ed25519Scalar;
 use crate::gadgets::curve::{AffinePointTarget, CircuitBuilderCurve};
 use crate::gadgets::nonnative::NonNativeTarget;
-use crate::field::ed25519_scalar::Ed25519Scalar;
 
 #[derive(Clone, Debug)]
 pub struct EDDSAPublicKeyTarget<C: Curve>(pub AffinePointTarget<C>);

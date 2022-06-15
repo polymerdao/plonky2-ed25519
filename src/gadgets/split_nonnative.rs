@@ -102,9 +102,9 @@ mod tests {
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
     use plonky2_field::field_types::Field;
 
+    use crate::field::ed25519_scalar::Ed25519Scalar;
     use crate::gadgets::nonnative::{CircuitBuilderNonNative, NonNativeTarget};
     use crate::gadgets::split_nonnative::CircuitBuilderSplit;
-    use crate::field::ed25519_scalar::Ed25519Scalar;
 
     #[test]
     fn test_split_nonnative() -> Result<()> {

@@ -181,10 +181,10 @@ mod tests {
 
     use crate::curve::curve_types::{Curve, CurveScalar};
     use crate::curve::ed25519::Ed25519;
+    use crate::field::ed25519_scalar::Ed25519Scalar;
     use crate::gadgets::curve::CircuitBuilderCurve;
     use crate::gadgets::curve_windowed_mul::CircuitBuilderWindowedMul;
     use crate::gadgets::nonnative::CircuitBuilderNonNative;
-    use crate::field::ed25519_scalar::Ed25519Scalar;
 
     #[test]
     fn test_random_access_curve_points() -> Result<()> {
@@ -232,8 +232,7 @@ mod tests {
         let pw = PartialWitness::new();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        let g =
-            (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
+        let g = (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
         let five = Ed25519Scalar::from_canonical_usize(5);
         let neg_five = five.neg();
         let neg_five_scalar = CurveScalar::<Ed25519>(neg_five);

@@ -1,10 +1,10 @@
 use plonky2_field::field_types::Field;
 use serde::{Deserialize, Serialize};
 
-use plonky2_field::field_types::PrimeField;
 use crate::curve::curve_types::{AffinePoint, Curve, ProjectivePoint};
 use crate::field::ed25519_base::Ed25519Base;
 use crate::field::ed25519_scalar::Ed25519Scalar;
+use plonky2_field::field_types::PrimeField;
 
 #[derive(Debug, Copy, Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Ed25519;
@@ -77,9 +77,9 @@ mod tests {
     use plonky2_field::field_types::Field;
 
     use crate::curve::curve_types::{AffinePoint, Curve};
+    use crate::curve::ed25519::mul_naive;
     use crate::curve::ed25519::Ed25519;
     use crate::field::ed25519_scalar::Ed25519Scalar;
-    use crate::curve::ed25519::mul_naive;
 
     #[test]
     fn test_generator() {

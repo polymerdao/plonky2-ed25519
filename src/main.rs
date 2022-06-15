@@ -1,30 +1,32 @@
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
 
-use log::{info, Level, LevelFilter};
 use anyhow::Result;
+use log::{info, Level, LevelFilter};
 use plonky2::gates::noop::NoopGate;
 use plonky2::hash::hash_types::RichField;
 use plonky2::iop::witness::{PartialWitness, Witness};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
-use plonky2::plonk::circuit_data::{CircuitConfig, CommonCircuitData, VerifierCircuitTarget, VerifierOnlyCircuitData};
+use plonky2::plonk::circuit_data::{
+    CircuitConfig, CommonCircuitData, VerifierCircuitTarget, VerifierOnlyCircuitData,
+};
 use plonky2::plonk::config::{AlgebraicHasher, GenericConfig, Hasher, PoseidonGoldilocksConfig};
 use plonky2::plonk::proof::{CompressedProofWithPublicInputs, ProofWithPublicInputs};
 use plonky2::plonk::prover::prove;
 use plonky2::util::timing::TimingTree;
-use plonky2_ed25519::gadgets::eddsa::verify_message_circuit;
-use plonky2_ed25519::gadgets::eddsa::EDDSASignatureTarget;
-use plonky2_ed25519::gadgets::curve::CircuitBuilderCurve;
-use plonky2_ed25519::gadgets::nonnative::{CircuitBuilderNonNative, NonNativeTarget};
-use plonky2_ed25519::gadgets::eddsa::EDDSAPublicKeyTarget;
+use plonky2_ed25519::curve::curve_types::AffinePoint;
+use plonky2_ed25519::curve::ed25519::Ed25519;
 use plonky2_ed25519::curve::eddsa::EDDSASignature;
 use plonky2_ed25519::curve::eddsa::{SAMPLE_H1, SAMPLE_H2, SAMPLE_PK1, SAMPLE_SIG1, SAMPLE_SIG2};
-use plonky2_ed25519::curve::ed25519::Ed25519;
-use plonky2_ed25519::curve::curve_types::AffinePoint;
 use plonky2_ed25519::field::ed25519_scalar::Ed25519Scalar;
+use plonky2_ed25519::gadgets::biguint::witness_set_biguint_target;
+use plonky2_ed25519::gadgets::curve::CircuitBuilderCurve;
+use plonky2_ed25519::gadgets::eddsa::verify_message_circuit;
+use plonky2_ed25519::gadgets::eddsa::EDDSAPublicKeyTarget;
+use plonky2_ed25519::gadgets::eddsa::EDDSASignatureTarget;
+use plonky2_ed25519::gadgets::nonnative::{CircuitBuilderNonNative, NonNativeTarget};
 use plonky2_field::extension_field::Extendable;
 use plonky2_field::field_types::PrimeField;
-use plonky2_ed25519::gadgets::biguint::witness_set_biguint_target;
 
 type ProofTuple<F, C, const D: usize> = (
     ProofWithPublicInputs<F, C, D>,
@@ -65,7 +67,9 @@ fn fill_circuits<F: RichField + Extendable<D>, const D: usize>(
     targets: &Ed25519Targets,
 ) {
     let Ed25519Targets {
-        msg_target, pk_target, sig_target
+        msg_target,
+        pk_target,
+        sig_target,
     } = targets;
 
     witness_set_biguint_target(pw, &msg_target.value, &h.to_canonical_biguint());
@@ -76,20 +80,24 @@ fn fill_circuits<F: RichField + Extendable<D>, const D: usize>(
     witness_set_biguint_target(pw, &sig_target.r.y.value, &sig.r.y.to_canonical_biguint());
 }
 
-fn prove_ed25519<F: RichField + Extendable<D>, C: GenericConfig<D, F=F>, const D: usize>(
+fn prove_ed25519<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
     h: Ed25519Scalar,
     sig: EDDSASignature<Ed25519>,
-    pk: AffinePoint<Ed25519>)
-    -> Result<ProofTuple<F, C, D>>
-    where
-        [(); C::Hasher::HASH_SIZE]:, {
+    pk: AffinePoint<Ed25519>,
+) -> Result<ProofTuple<F, C, D>>
+where
+    [(); C::Hasher::HASH_SIZE]:,
+{
     let mut builder = CircuitBuilder::<F, D>::new(CircuitConfig::wide_ecc_config());
 
     let targets = make_circuits(&mut builder);
     let mut pw = PartialWitness::new();
     fill_circuits::<F, D>(&mut pw, h, sig, pk, &targets);
 
-    println!("Constructing inner proof with {} gates", builder.num_gates());
+    println!(
+        "Constructing inner proof with {} gates",
+        builder.num_gates()
+    );
     let data = builder.build::<C>();
 
     let timing = TimingTree::new("prove", Level::Debug);
@@ -106,8 +114,8 @@ fn prove_ed25519<F: RichField + Extendable<D>, C: GenericConfig<D, F=F>, const D
 
 fn recursive_proof<
     F: RichField + Extendable<D>,
-    C: GenericConfig<D, F=F>,
-    InnerC: GenericConfig<D, F=F>,
+    C: GenericConfig<D, F = F>,
+    InnerC: GenericConfig<D, F = F>,
     const D: usize,
 >(
     inner1: &ProofTuple<F, InnerC, D>,
@@ -115,9 +123,9 @@ fn recursive_proof<
     config: &CircuitConfig,
     min_degree_bits: Option<usize>,
 ) -> Result<ProofTuple<F, C, D>>
-    where
-        InnerC::Hasher: AlgebraicHasher<F>,
-        [(); C::Hasher::HASH_SIZE]:,
+where
+    InnerC::Hasher: AlgebraicHasher<F>,
+    [(); C::Hasher::HASH_SIZE]:,
 {
     let mut builder = CircuitBuilder::<F, D>::new(config.clone());
     let mut pw = PartialWitness::new();
@@ -209,12 +217,12 @@ fn benchmark() -> Result<()> {
 }
 
 /// Test serialization and print some size info.
-fn test_serialization<F: RichField + Extendable<D>, C: GenericConfig<D, F=F>, const D: usize>(
+fn test_serialization<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
     proof: &ProofWithPublicInputs<F, C, D>,
     cd: &CommonCircuitData<F, C, D>,
 ) -> Result<()>
-    where
-        [(); C::Hasher::HASH_SIZE]:,
+where
+    [(); C::Hasher::HASH_SIZE]:,
 {
     let proof_bytes = proof.to_bytes()?;
     info!("Proof length: {} bytes", proof_bytes.len());

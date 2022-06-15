@@ -72,7 +72,7 @@ pub trait CircuitBuilderCurve<F: RichField + Extendable<D>, const D: usize> {
 }
 
 impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderCurve<F, D>
-for CircuitBuilder<F, D>
+    for CircuitBuilder<F, D>
 {
     fn constant_affine_point<C: Curve>(&mut self, point: AffinePoint<C>) -> AffinePointTarget<C> {
         debug_assert!(!point.zero);
@@ -280,10 +280,10 @@ mod tests {
 
     use crate::curve::curve_types::{AffinePoint, Curve, CurveScalar};
     use crate::curve::ed25519::Ed25519;
-    use crate::gadgets::curve::CircuitBuilderCurve;
-    use crate::gadgets::nonnative::CircuitBuilderNonNative;
     use crate::field::ed25519_base::Ed25519Base;
     use crate::field::ed25519_scalar::Ed25519Scalar;
+    use crate::gadgets::curve::CircuitBuilderCurve;
+    use crate::gadgets::nonnative::CircuitBuilderNonNative;
 
     #[test]
     fn test_curve_point_is_valid() -> Result<()> {
@@ -481,7 +481,8 @@ mod tests {
         let pw = PartialWitness::new();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        let rando = (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
+        let rando =
+            (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
         assert!(rando.is_valid());
         let randot = builder.constant_affine_point(rando);
 

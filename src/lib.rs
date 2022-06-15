@@ -4,5 +4,5 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
 pub mod curve;
-pub mod gadgets;
 pub mod field;
+pub mod gadgets;

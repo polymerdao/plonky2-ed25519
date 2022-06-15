@@ -87,10 +87,10 @@ mod tests {
 
     use crate::curve::curve_types::{Curve, CurveScalar};
     use crate::curve::ed25519::Ed25519;
+    use crate::field::ed25519_scalar::Ed25519Scalar;
     use crate::gadgets::curve::CircuitBuilderCurve;
     use crate::gadgets::curve_msm::curve_msm_circuit;
     use crate::gadgets::nonnative::CircuitBuilderNonNative;
-    use crate::field::ed25519_scalar::Ed25519Scalar;
 
     #[test]
     #[ignore]
@@ -104,10 +104,8 @@ mod tests {
         let pw = PartialWitness::new();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        let p =
-            (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
-        let q =
-            (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
+        let p = (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
+        let q = (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
         let n = Ed25519Scalar::rand();
         let m = Ed25519Scalar::rand();
 
