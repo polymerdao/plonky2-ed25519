@@ -1,10 +1,26 @@
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha512};
 
 use crate::curve::curve_types::{AffinePoint, Curve};
 use crate::curve::ed25519::mul_naive;
 use crate::curve::ed25519::Ed25519;
 use crate::field::ed25519_base::Ed25519Base;
 use crate::field::ed25519_scalar::Ed25519Scalar;
+
+pub const SAMPLE_MSG1: &str = "test message";
+pub const SAMPLE_MSG2: &str = "plonky2";
+pub const SAMPLE_PKV1: [u8; 1] = [0];
+pub const SAMPLE_PKV2: [u8; 32] = [
+    59, 106, 39, 188, 206, 182, 164, 45, 98, 163, 168, 208, 42, 111, 13, 115, 101, 50, 21, 119, 29,
+    226, 67, 166, 58, 192, 72, 161, 139, 89, 218, 41,
+];
+pub const SAMPLE_SIGV1: [u8; 1] = [0];
+pub const SAMPLE_SIGV2: [u8; 64] = [
+    130, 82, 60, 170, 184, 218, 199, 182, 66, 19, 182, 14, 141, 214, 229, 180, 43, 19, 227, 183,
+    130, 204, 69, 112, 171, 113, 6, 111, 218, 227, 249, 85, 57, 216, 145, 63, 71, 192, 201, 10, 54,
+    234, 203, 8, 63, 240, 226, 101, 84, 167, 36, 246, 153, 35, 31, 52, 244, 82, 239, 137, 18, 62,
+    134, 7,
+];
 
 pub const SAMPLE_PK1: AffinePoint<Ed25519> = AffinePoint {
     x: Ed25519Base([
@@ -95,10 +111,23 @@ pub struct EDDSASignature<C: Curve> {
 }
 
 pub fn verify_message(
+    msg: &[u8],
+    sigv: &[u8],
+    pkv: &[u8],
     h: Ed25519Scalar,
     sig: EDDSASignature<Ed25519>,
     pk: AffinePoint<Ed25519>,
 ) -> bool {
+    let mut data = Vec::new();
+    data.extend_from_slice(&sigv[..32]);
+    data.extend_from_slice(pkv);
+    data.extend_from_slice(msg);
+    let data_u8 = data.as_slice();
+
+    let mut hasher = Sha512::new();
+    hasher.update(data_u8);
+    let _ = hasher.finalize();
+
     let EDDSASignature { r, s } = sig;
 
     assert!(pk.is_valid());
@@ -114,14 +143,29 @@ pub fn verify_message(
 #[cfg(test)]
 mod tests {
     use crate::curve::eddsa::{
-        verify_message, SAMPLE_H1, SAMPLE_H2, SAMPLE_PK1, SAMPLE_SIG1, SAMPLE_SIG2,
+        verify_message, SAMPLE_H1, SAMPLE_H2, SAMPLE_MSG1, SAMPLE_MSG2, SAMPLE_PK1, SAMPLE_PKV1,
+        SAMPLE_PKV2, SAMPLE_SIG1, SAMPLE_SIG2, SAMPLE_SIGV1, SAMPLE_SIGV2,
     };
 
     #[test]
     fn test_ecdsa_native() {
-        let result = verify_message(SAMPLE_H1, SAMPLE_SIG1, SAMPLE_PK1);
-        assert!(result);
-        let result = verify_message(SAMPLE_H2, SAMPLE_SIG2, SAMPLE_PK1);
+        // let result = verify_message(
+        //     SAMPLE_MSG1.as_bytes(),
+        //     SAMPLE_SIGV1.as_slice(),
+        //     SAMPLE_PKV1.as_slice(),
+        //     SAMPLE_H1,
+        //     SAMPLE_SIG1,
+        //     SAMPLE_PK1,
+        // );
+        // assert!(result);
+        let result = verify_message(
+            SAMPLE_MSG2.as_bytes(),
+            SAMPLE_SIGV2.as_slice(),
+            SAMPLE_PKV2.as_slice(),
+            SAMPLE_H1,
+            SAMPLE_SIG1,
+            SAMPLE_PK1,
+        );
         assert!(result);
     }
 }

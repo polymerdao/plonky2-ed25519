@@ -1,6 +1,8 @@
 use plonky2::hash::hash_types::RichField;
+use plonky2::iop::target::BoolTarget;
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2_field::extension_field::Extendable;
+use plonky2_sha512::circuit::{make_circuits, Sha512Targets};
 
 use crate::curve::curve_types::Curve;
 use crate::curve::ed25519::Ed25519;

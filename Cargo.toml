@@ -10,6 +10,7 @@ plonky2 = { git = "https://github.com/mir-protocol/plonky2" }
 plonky2_util = { git = "https://github.com/mir-protocol/plonky2" }
 plonky2_field = { git = "https://github.com/mir-protocol/plonky2" }
 plonky2_u32 = { git = "https://github.com/mir-protocol/plonky2" }
+plonky2_sha512 = { git = "https://github.com/polymerdao/plonky2-sha512" }
 itertools = "0.10.0"
 rayon = "1.5.1"
 serde = { version = "1.0", features = ["derive"] }
@@ -22,6 +23,7 @@ rand_chacha = "0.3.1"
 unroll = "0.1.5"
 keccak-hash = "0.8.0"
 static_assertions = "1.1.0"
+sha2 = "0.10"
 
 [profile.release]
 opt-level = 3
@@ -32,4 +34,4 @@ opt-level = 3
 opt-level = 3
 
 [profile.test]
-opt-level = 3
+opt-level = 1
