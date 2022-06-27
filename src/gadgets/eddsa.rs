@@ -1,14 +1,18 @@
 use plonky2::hash::hash_types::RichField;
 use plonky2::iop::target::BoolTarget;
+use plonky2::iop::witness::{PartialWitness, Witness};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2_field::extension_field::Extendable;
-use plonky2_sha512::circuit::{make_circuits, Sha512Targets};
+use plonky2_field::field_types::PrimeField;
+use plonky2_sha512::circuit::array_to_bits;
 
-use crate::curve::curve_types::Curve;
+use crate::curve::curve_types::{AffinePoint, Curve};
 use crate::curve::ed25519::Ed25519;
+use crate::curve::eddsa::EDDSASignature;
 use crate::field::ed25519_scalar::Ed25519Scalar;
+use crate::gadgets::biguint::witness_set_biguint_target;
 use crate::gadgets::curve::{AffinePointTarget, CircuitBuilderCurve};
-use crate::gadgets::nonnative::NonNativeTarget;
+use crate::gadgets::nonnative::{CircuitBuilderNonNative, NonNativeTarget};
 
 #[derive(Clone, Debug)]
 pub struct EDDSAPublicKeyTarget<C: Curve>(pub AffinePointTarget<C>);
@@ -19,23 +23,68 @@ pub struct EDDSASignatureTarget<C: Curve> {
     pub s: NonNativeTarget<C::ScalarField>,
 }
 
+pub struct EDDSATargets {
+    pub msg: Vec<BoolTarget>,
+    pub h: NonNativeTarget<Ed25519Scalar>,
+    pub sig: EDDSASignatureTarget<Ed25519>,
+    pub pk: EDDSAPublicKeyTarget<Ed25519>,
+}
+
 pub fn verify_message_circuit<F: RichField + Extendable<D>, const D: usize>(
     builder: &mut CircuitBuilder<F, D>,
-    h: &NonNativeTarget<Ed25519Scalar>,
-    sig: &EDDSASignatureTarget<Ed25519>,
-    pk: &EDDSAPublicKeyTarget<Ed25519>,
-) {
-    let EDDSASignatureTarget { r, s } = sig;
+    msg_len_in_bits: u128,
+) -> EDDSATargets {
+    let sha512 = plonky2_sha512::circuit::make_circuits(builder, msg_len_in_bits);
 
-    builder.curve_assert_valid(&pk.0);
-    builder.curve_assert_valid(&r);
+    let h = builder.add_virtual_nonnative_target();
+    let pk = builder.add_virtual_affine_point_target();
+    let r = builder.add_virtual_affine_point_target();
+    let s = builder.add_virtual_nonnative_target();
 
     let g = builder.constant_affine_point(Ed25519::GENERATOR_AFFINE);
     let sb = builder.curve_scalar_mul(&g, &s);
-    let ha = builder.curve_scalar_mul(&pk.0, &h);
+    let ha = builder.curve_scalar_mul(&pk, &h);
     let rhs = builder.curve_add(&r, &ha);
 
     builder.connect_affine_point(&sb, &rhs);
+
+    return EDDSATargets {
+        msg: sha512.message,
+        h,
+        sig: EDDSASignatureTarget { r, s },
+        pk: EDDSAPublicKeyTarget {
+            0: AffinePointTarget { x: pk.x, y: pk.y },
+        },
+    };
+}
+
+pub fn fill_circuits<F: RichField + Extendable<D>, const D: usize>(
+    pw: &mut PartialWitness<F>,
+    msg: &[u8],
+    h: Ed25519Scalar,
+    sig: EDDSASignature<Ed25519>,
+    pk: AffinePoint<Ed25519>,
+    targets: &EDDSATargets,
+) {
+    let EDDSATargets {
+        msg: msg_targets,
+        sig: sig_target,
+        h: h_target,
+        pk: pk_target,
+    } = targets;
+
+    let len = msg.len();
+    let msg_bits = array_to_bits(msg);
+    for i in 0..len {
+        pw.set_bool_target(msg_targets[i], msg_bits[i]);
+    }
+
+    witness_set_biguint_target(pw, &h_target.value, &h.to_canonical_biguint());
+    witness_set_biguint_target(pw, &pk_target.0.x.value, &pk.x.to_canonical_biguint());
+    witness_set_biguint_target(pw, &pk_target.0.y.value, &pk.y.to_canonical_biguint());
+    witness_set_biguint_target(pw, &sig_target.s.value, &sig.s.to_canonical_biguint());
+    witness_set_biguint_target(pw, &sig_target.r.x.value, &sig.r.x.to_canonical_biguint());
+    witness_set_biguint_target(pw, &sig_target.r.y.value, &sig.r.y.to_canonical_biguint());
 }
 
 #[cfg(test)]
@@ -46,31 +95,27 @@ mod tests {
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
 
-    use super::{EDDSAPublicKeyTarget, EDDSASignatureTarget};
-    use crate::curve::eddsa::{SAMPLE_H1, SAMPLE_PK1, SAMPLE_SIG1};
-    use crate::gadgets::curve::CircuitBuilderCurve;
-    use crate::gadgets::eddsa::verify_message_circuit;
-    use crate::gadgets::nonnative::CircuitBuilderNonNative;
+    use crate::curve::eddsa::{SAMPLE_H1, SAMPLE_MSG1, SAMPLE_PK1, SAMPLE_SIG1};
+    use crate::gadgets::eddsa::{fill_circuits, verify_message_circuit};
 
     fn test_ecdsa_circuit_with_config(config: CircuitConfig) -> Result<()> {
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
 
-        let pw = PartialWitness::new();
+        let mut pw = PartialWitness::new();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        let msg_target = builder.constant_nonnative(SAMPLE_H1);
-        let pk_target = EDDSAPublicKeyTarget(builder.constant_affine_point(SAMPLE_PK1));
-        let r_target = builder.constant_affine_point(SAMPLE_SIG1.r);
-        let s_target = builder.constant_nonnative(SAMPLE_SIG1.s);
+        let targets = verify_message_circuit(&mut builder, SAMPLE_MSG1.len() as u128);
 
-        let sig_target = EDDSASignatureTarget {
-            r: r_target,
-            s: s_target,
-        };
-
-        verify_message_circuit(&mut builder, &msg_target, &sig_target, &pk_target);
+        fill_circuits::<F, D>(
+            &mut pw,
+            SAMPLE_MSG1.as_bytes(),
+            SAMPLE_H1,
+            SAMPLE_SIG1,
+            SAMPLE_PK1,
+            &targets,
+        );
 
         dbg!(builder.num_gates());
         let data = builder.build::<C>();
