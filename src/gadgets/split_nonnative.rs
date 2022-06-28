@@ -8,8 +8,8 @@ use plonky2_field::extension::Extendable;
 use plonky2_field::types::Field;
 use plonky2_u32::gadgets::arithmetic_u32::{CircuitBuilderU32, U32Target};
 
-use crate::gadgets::biguint::BigUintTarget;
 use crate::gadgets::nonnative::NonNativeTarget;
+use plonky2_ecdsa::gadgets::biguint::BigUintTarget;
 
 pub trait CircuitBuilderSplit<F: RichField + Extendable<D>, const D: usize> {
     fn split_u32_to_4_bit_limbs(&mut self, val: U32Target) -> Vec<Target>;

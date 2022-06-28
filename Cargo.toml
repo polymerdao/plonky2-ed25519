@@ -10,6 +10,7 @@ plonky2 = { git = "https://github.com/mir-protocol/plonky2", rev = "dec0765f" }
 plonky2_util = { git = "https://github.com/mir-protocol/plonky2", rev = "dec0765f" }
 plonky2_field = { git = "https://github.com/mir-protocol/plonky2", rev = "dec0765f" }
 plonky2_u32 = { git = "https://github.com/mir-protocol/plonky2", rev = "dec0765f" }
+plonky2_ecdsa = { git = "https://github.com/mir-protocol/plonky2", rev = "dec0765f" }
 plonky2_sha512 = { git = "https://github.com/polymerdao/plonky2-sha512", rev = "fd662c18" }
 itertools = "0.10.0"
 rayon = "1.5.1"

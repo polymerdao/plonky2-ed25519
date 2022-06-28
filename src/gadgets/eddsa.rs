@@ -3,14 +3,14 @@ use plonky2::iop::target::BoolTarget;
 use plonky2::iop::witness::{PartialWitness, Witness};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2_field::extension::Extendable;
-use plonky2_field::types::PrimeField;
+use plonky2_field::types::{Field, PrimeField};
 use plonky2_sha512::circuit::{array_to_bits, bits_to_biguint_target};
+use plonky2_ecdsa::gadgets::biguint::{witness_set_biguint_target, CircuitBuilderBiguint};
 
 use crate::curve::curve_types::{AffinePoint, Curve};
 use crate::curve::ed25519::Ed25519;
 use crate::curve::eddsa::EDDSASignature;
 use crate::field::ed25519_scalar::Ed25519Scalar;
-use crate::gadgets::biguint::witness_set_biguint_target;
 use crate::gadgets::curve::{AffinePointTarget, CircuitBuilderCurve};
 use crate::gadgets::nonnative::{CircuitBuilderNonNative, NonNativeTarget};
 
@@ -36,6 +36,11 @@ pub fn make_verify_circuits<F: RichField + Extendable<D>, const D: usize>(
 ) -> EDDSATargets {
     let sha512 = plonky2_sha512::circuit::make_circuits(builder, msg_len_in_bits);
 
+    let hash = bits_to_biguint_target(builder, sha512.message.clone());
+    let order = builder.constant_biguint(&Ed25519Scalar::order());
+    let h_biguint = builder.rem_biguint(&hash, &order);
+    let h2 = builder.biguint_to_nonnative(&h_biguint);
+
     let h = builder.add_virtual_nonnative_target();
     let pk = builder.add_virtual_affine_point_target();
     let r = builder.add_virtual_affine_point_target();
@@ -46,6 +51,7 @@ pub fn make_verify_circuits<F: RichField + Extendable<D>, const D: usize>(
     let ha = builder.curve_scalar_mul(&pk, &h);
     let rhs = builder.curve_add(&r, &ha);
 
+    builder.connect_nonnative(&h, &h2);
     builder.connect_affine_point(&sb, &rhs);
 
     return EDDSATargets {

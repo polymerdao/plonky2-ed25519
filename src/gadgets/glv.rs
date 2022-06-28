@@ -12,10 +12,10 @@ use crate::curve::ed25519::Ed25519;
 use crate::curve::glv::{decompose_ed25519_scalar, GLV_BETA, GLV_S};
 use crate::field::ed25519_base::Ed25519Base;
 use crate::field::ed25519_scalar::Ed25519Scalar;
-use crate::gadgets::biguint::{buffer_set_biguint_target, witness_get_biguint_target};
 use crate::gadgets::curve::{AffinePointTarget, CircuitBuilderCurve};
 use crate::gadgets::curve_msm::curve_msm_circuit;
 use crate::gadgets::nonnative::{CircuitBuilderNonNative, NonNativeTarget};
+use plonky2_ecdsa::gadgets::biguint::{buffer_set_biguint_target, witness_get_biguint_target};
 
 pub trait CircuitBuilderGlv<F: RichField + Extendable<D>, const D: usize> {
     fn ed25519_glv_beta(&mut self) -> NonNativeTarget<Ed25519Base>;

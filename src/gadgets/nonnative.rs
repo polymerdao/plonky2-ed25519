@@ -13,7 +13,7 @@ use plonky2_u32::gadgets::range_check::range_check_u32_circuit;
 use plonky2_u32::witness::generated_values_set_u32_target;
 use plonky2_util::ceil_div_usize;
 
-use crate::gadgets::biguint::{
+use plonky2_ecdsa::gadgets::biguint::{
     buffer_set_biguint_target, witness_get_biguint_target, BigUintTarget, CircuitBuilderBiguint,
 };
 
