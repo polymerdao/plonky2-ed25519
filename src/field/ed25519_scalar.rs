@@ -11,7 +11,7 @@ use num::{Integer, One};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use plonky2_field::field_types::{Field, PrimeField};
+use plonky2_field::types::{Field, PrimeField};
 
 /// The order of the Ed25519 elliptic curve is
 /// ```ignore

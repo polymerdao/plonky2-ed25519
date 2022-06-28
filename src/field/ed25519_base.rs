@@ -10,7 +10,7 @@ use num::{Integer, One};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use plonky2_field::field_types::{Field, PrimeField};
+use plonky2_field::types::{Field, PrimeField};
 
 /// The base field of the curve25519 elliptic curve.
 ///

@@ -20,7 +20,7 @@ use plonky2_ed25519::curve::eddsa::{EDDSASignature, SAMPLE_MSG1, SAMPLE_MSG2};
 use plonky2_ed25519::curve::eddsa::{SAMPLE_H1, SAMPLE_H2, SAMPLE_PK1, SAMPLE_SIG1, SAMPLE_SIG2};
 use plonky2_ed25519::field::ed25519_scalar::Ed25519Scalar;
 use plonky2_ed25519::gadgets::eddsa::{fill_circuits, make_verify_circuits};
-use plonky2_field::extension_field::Extendable;
+use plonky2_field::extension::Extendable;
 
 type ProofTuple<F, C, const D: usize> = (
     ProofWithPublicInputs<F, C, D>,

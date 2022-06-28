@@ -1,5 +1,5 @@
 use num::{BigUint, Integer};
-use plonky2_field::field_types::Field;
+use plonky2_field::types::Field;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
 

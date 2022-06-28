@@ -1,6 +1,6 @@
 use itertools::Itertools;
-use plonky2_field::field_types::Field;
-use plonky2_field::field_types::PrimeField;
+use plonky2_field::types::Field;
+use plonky2_field::types::PrimeField;
 use rayon::prelude::*;
 
 use crate::curve::curve_summation::affine_multisummation_best;
@@ -187,8 +187,8 @@ pub(crate) fn to_digits<C: Curve>(x: &C::ScalarField, w: usize) -> Vec<usize> {
 #[cfg(test)]
 mod tests {
     use num::BigUint;
-    use plonky2_field::field_types::Field;
-    use plonky2_field::field_types::PrimeField;
+    use plonky2_field::types::Field;
+    use plonky2_field::types::PrimeField;
 
     use crate::curve::curve_msm::{msm_execute, msm_precompute, to_digits};
     use crate::curve::curve_types::Curve;

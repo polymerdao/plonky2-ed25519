@@ -2,9 +2,9 @@ use plonky2::hash::hash_types::RichField;
 use plonky2::iop::target::BoolTarget;
 use plonky2::iop::witness::{PartialWitness, Witness};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
-use plonky2_field::extension_field::Extendable;
-use plonky2_field::field_types::PrimeField;
-use plonky2_sha512::circuit::array_to_bits;
+use plonky2_field::extension::Extendable;
+use plonky2_field::types::PrimeField;
+use plonky2_sha512::circuit::{array_to_bits, bits_to_biguint_target};
 
 use crate::curve::curve_types::{AffinePoint, Curve};
 use crate::curve::ed25519::Ed25519;
@@ -40,8 +40,8 @@ pub fn make_verify_circuits<F: RichField + Extendable<D>, const D: usize>(
     let pk = builder.add_virtual_affine_point_target();
     let r = builder.add_virtual_affine_point_target();
     let s = builder.add_virtual_nonnative_target();
-
     let g = builder.constant_affine_point(Ed25519::GENERATOR_AFFINE);
+
     let sb = builder.curve_scalar_mul(&g, &s);
     let ha = builder.curve_scalar_mul(&pk, &h);
     let rhs = builder.curve_add(&r, &ha);

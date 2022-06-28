@@ -3,7 +3,7 @@ macro_rules! test_field_arithmetic {
     ($field:ty) => {
         mod field_arithmetic {
             use num::bigint::BigUint;
-            use plonky2_field::field_types::Field;
+            use plonky2_field::types::Field;
             use rand::Rng;
 
             #[test]

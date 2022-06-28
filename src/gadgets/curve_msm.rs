@@ -3,8 +3,8 @@ use plonky2::hash::hash_types::RichField;
 use plonky2::hash::keccak::KeccakHash;
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::config::{GenericHashOut, Hasher};
-use plonky2_field::extension_field::Extendable;
-use plonky2_field::field_types::Field;
+use plonky2_field::extension::Extendable;
+use plonky2_field::types::Field;
 
 use crate::curve::curve_types::{Curve, CurveScalar};
 use crate::gadgets::curve::{AffinePointTarget, CircuitBuilderCurve};
@@ -83,7 +83,7 @@ mod tests {
     use plonky2::plonk::circuit_builder::CircuitBuilder;
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
-    use plonky2_field::field_types::Field;
+    use plonky2_field::types::Field;
 
     use crate::curve::curve_types::{Curve, CurveScalar};
     use crate::curve::ed25519::Ed25519;

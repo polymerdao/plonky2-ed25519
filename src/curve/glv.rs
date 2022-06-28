@@ -1,6 +1,6 @@
 use num::rational::Ratio;
 use num::BigUint;
-use plonky2_field::field_types::{Field, PrimeField};
+use plonky2_field::types::{Field, PrimeField};
 
 use crate::curve::curve_msm::msm_parallel;
 use crate::curve::curve_types::{AffinePoint, ProjectivePoint};
@@ -99,7 +99,7 @@ pub fn glv_mul(p: ProjectivePoint<Ed25519>, k: Ed25519Scalar) -> ProjectivePoint
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use plonky2_field::field_types::Field;
+    use plonky2_field::types::Field;
 
     use crate::curve::curve_types::{Curve, CurveScalar};
     use crate::curve::ed25519::Ed25519;
