@@ -30,7 +30,7 @@ pub struct EDDSATargets {
     pub pk: EDDSAPublicKeyTarget<Ed25519>,
 }
 
-pub fn verify_message_circuit<F: RichField + Extendable<D>, const D: usize>(
+pub fn make_verify_circuits<F: RichField + Extendable<D>, const D: usize>(
     builder: &mut CircuitBuilder<F, D>,
     msg_len_in_bits: u128,
 ) -> EDDSATargets {
@@ -96,7 +96,7 @@ mod tests {
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
 
     use crate::curve::eddsa::{SAMPLE_H1, SAMPLE_MSG1, SAMPLE_PK1, SAMPLE_SIG1};
-    use crate::gadgets::eddsa::{fill_circuits, verify_message_circuit};
+    use crate::gadgets::eddsa::{fill_circuits, make_verify_circuits};
 
     fn test_ecdsa_circuit_with_config(config: CircuitConfig) -> Result<()> {
         const D: usize = 2;
@@ -106,7 +106,7 @@ mod tests {
         let mut pw = PartialWitness::new();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        let targets = verify_message_circuit(&mut builder, SAMPLE_MSG1.len() as u128);
+        let targets = make_verify_circuits(&mut builder, SAMPLE_MSG1.len() as u128);
 
         fill_circuits::<F, D>(
             &mut pw,

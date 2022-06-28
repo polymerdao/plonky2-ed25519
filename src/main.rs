@@ -19,7 +19,7 @@ use plonky2_ed25519::curve::ed25519::Ed25519;
 use plonky2_ed25519::curve::eddsa::{EDDSASignature, SAMPLE_MSG1, SAMPLE_MSG2};
 use plonky2_ed25519::curve::eddsa::{SAMPLE_H1, SAMPLE_H2, SAMPLE_PK1, SAMPLE_SIG1, SAMPLE_SIG2};
 use plonky2_ed25519::field::ed25519_scalar::Ed25519Scalar;
-use plonky2_ed25519::gadgets::eddsa::{fill_circuits, verify_message_circuit};
+use plonky2_ed25519::gadgets::eddsa::{fill_circuits, make_verify_circuits};
 use plonky2_field::extension_field::Extendable;
 
 type ProofTuple<F, C, const D: usize> = (
@@ -39,7 +39,7 @@ where
 {
     let mut builder = CircuitBuilder::<F, D>::new(CircuitConfig::wide_ecc_config());
 
-    let targets = verify_message_circuit(&mut builder, msg.len() as u128);
+    let targets = make_verify_circuits(&mut builder, msg.len() as u128);
     let mut pw = PartialWitness::new();
     fill_circuits::<F, D>(&mut pw, msg, h, sig, pk, &targets);
 
