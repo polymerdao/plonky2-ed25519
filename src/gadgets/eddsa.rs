@@ -2,15 +2,14 @@ use plonky2::hash::hash_types::RichField;
 use plonky2::iop::target::BoolTarget;
 use plonky2::iop::witness::{PartialWitness, Witness};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
+use plonky2_ecdsa::gadgets::biguint::witness_set_biguint_target;
 use plonky2_field::extension::Extendable;
-use plonky2_field::types::{Field, PrimeField};
-use plonky2_sha512::circuit::{array_to_bits, bits_to_biguint_target};
-use plonky2_ecdsa::gadgets::biguint::{witness_set_biguint_target, CircuitBuilderBiguint};
+use plonky2_field::types::PrimeField;
+use plonky2_sha512::circuit::{array_to_bits, bits_to_biguint_target, make_circuits};
 
 use crate::curve::curve_types::{AffinePoint, Curve};
 use crate::curve::ed25519::Ed25519;
 use crate::curve::eddsa::EDDSASignature;
-use crate::field::ed25519_scalar::Ed25519Scalar;
 use crate::gadgets::curve::{AffinePointTarget, CircuitBuilderCurve};
 use crate::gadgets::nonnative::{CircuitBuilderNonNative, NonNativeTarget};
 
@@ -24,24 +23,46 @@ pub struct EDDSASignatureTarget<C: Curve> {
 }
 
 pub struct EDDSATargets {
-    pub msg: Vec<BoolTarget>,
-    pub h: NonNativeTarget<Ed25519Scalar>,
+    pub sha512_msg: Vec<BoolTarget>,
+    pub sigv: Vec<BoolTarget>,
+    pub pkv: Vec<BoolTarget>,
     pub sig: EDDSASignatureTarget<Ed25519>,
     pub pk: EDDSAPublicKeyTarget<Ed25519>,
 }
 
 pub fn make_verify_circuits<F: RichField + Extendable<D>, const D: usize>(
     builder: &mut CircuitBuilder<F, D>,
-    msg_len_in_bits: u128,
+    msg_len: usize,
 ) -> EDDSATargets {
-    let sha512 = plonky2_sha512::circuit::make_circuits(builder, msg_len_in_bits);
+    let msg_len_in_bits = msg_len * 8;
+    let sha512_msg_len = msg_len_in_bits + 512;
+    let sha512 = make_circuits(builder, sha512_msg_len as u128);
 
-    let hash = bits_to_biguint_target(builder, sha512.message.clone());
-    let order = builder.constant_biguint(&Ed25519Scalar::order());
-    let h_biguint = builder.rem_biguint(&hash, &order);
-    let h2 = builder.biguint_to_nonnative(&h_biguint);
+    let mut sigv = Vec::new();
+    let mut pkv = Vec::new();
+    for _ in 0..512 {
+        sigv.push(builder.add_virtual_bool_target());
+    }
+    for _ in 0..256 {
+        pkv.push(builder.add_virtual_bool_target());
+    }
+    for i in 0..256 {
+        builder.connect(sha512.message[i].target, sigv[i].target);
+    }
+    for i in 0..256 {
+        builder.connect(sha512.message[256 + i].target, pkv[i].target);
+    }
 
-    let h = builder.add_virtual_nonnative_target();
+    let mut digest_bits = Vec::new();
+    for i in 0..64 {
+        for j in 0..8 {
+            digest_bits.push(sha512.digest[i * 8 + 7 - j]);
+        }
+    }
+    digest_bits.reverse();
+    let hash = bits_to_biguint_target(builder, digest_bits);
+    let h = builder.reduce(&hash);
+
     let pk = builder.add_virtual_affine_point_target();
     let r = builder.add_virtual_affine_point_target();
     let s = builder.add_virtual_nonnative_target();
@@ -51,12 +72,12 @@ pub fn make_verify_circuits<F: RichField + Extendable<D>, const D: usize>(
     let ha = builder.curve_scalar_mul(&pk, &h);
     let rhs = builder.curve_add(&r, &ha);
 
-    builder.connect_nonnative(&h, &h2);
     builder.connect_affine_point(&sb, &rhs);
 
     return EDDSATargets {
-        msg: sha512.message,
-        h,
+        sha512_msg: sha512.message,
+        sigv,
+        pkv,
         sig: EDDSASignatureTarget { r, s },
         pk: EDDSAPublicKeyTarget {
             0: AffinePointTarget { x: pk.x, y: pk.y },
@@ -67,25 +88,33 @@ pub fn make_verify_circuits<F: RichField + Extendable<D>, const D: usize>(
 pub fn fill_circuits<F: RichField + Extendable<D>, const D: usize>(
     pw: &mut PartialWitness<F>,
     msg: &[u8],
-    h: Ed25519Scalar,
+    sigv: &[u8],
+    pkv: &[u8],
     sig: EDDSASignature<Ed25519>,
     pk: AffinePoint<Ed25519>,
     targets: &EDDSATargets,
 ) {
     let EDDSATargets {
-        msg: msg_targets,
+        sha512_msg: sha512_msg_targets,
+        sigv: sigv_targets,
+        pkv: pkv_targets,
         sig: sig_target,
-        h: h_target,
         pk: pk_target,
     } = targets;
 
-    let len = msg.len();
+    let sigv_bits = array_to_bits(sigv);
+    let pkv_bits = array_to_bits(pkv);
     let msg_bits = array_to_bits(msg);
-    for i in 0..len {
-        pw.set_bool_target(msg_targets[i], msg_bits[i]);
+    for i in 0..msg_bits.len() {
+        pw.set_bool_target(sha512_msg_targets[512 + i], msg_bits[i]);
+    }
+    for i in 0..512 {
+        pw.set_bool_target(sigv_targets[i], sigv_bits[i]);
+    }
+    for i in 0..256 {
+        pw.set_bool_target(pkv_targets[i], pkv_bits[i]);
     }
 
-    witness_set_biguint_target(pw, &h_target.value, &h.to_canonical_biguint());
     witness_set_biguint_target(pw, &pk_target.0.x.value, &pk.x.to_canonical_biguint());
     witness_set_biguint_target(pw, &pk_target.0.y.value, &pk.y.to_canonical_biguint());
     witness_set_biguint_target(pw, &sig_target.s.value, &sig.s.to_canonical_biguint());
@@ -101,10 +130,10 @@ mod tests {
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
 
-    use crate::curve::eddsa::{SAMPLE_H1, SAMPLE_MSG1, SAMPLE_PK1, SAMPLE_SIG1};
+    use crate::curve::eddsa::{SAMPLE_MSG1, SAMPLE_PK1, SAMPLE_PKV1, SAMPLE_SIG1, SAMPLE_SIGV1};
     use crate::gadgets::eddsa::{fill_circuits, make_verify_circuits};
 
-    fn test_ecdsa_circuit_with_config(config: CircuitConfig) -> Result<()> {
+    fn test_eddsa_circuit_with_config(config: CircuitConfig) -> Result<()> {
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
@@ -112,12 +141,13 @@ mod tests {
         let mut pw = PartialWitness::new();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        let targets = make_verify_circuits(&mut builder, SAMPLE_MSG1.len() as u128);
+        let targets = make_verify_circuits(&mut builder, SAMPLE_MSG1.len());
 
         fill_circuits::<F, D>(
             &mut pw,
             SAMPLE_MSG1.as_bytes(),
-            SAMPLE_H1,
+            SAMPLE_SIGV1.as_slice(),
+            SAMPLE_PKV1.as_slice(),
             SAMPLE_SIG1,
             SAMPLE_PK1,
             &targets,
@@ -131,13 +161,13 @@ mod tests {
 
     #[test]
     #[ignore]
-    fn test_ecdsa_circuit_narrow() -> Result<()> {
-        test_ecdsa_circuit_with_config(CircuitConfig::standard_ecc_config())
+    fn test_eddsa_circuit_narrow() -> Result<()> {
+        test_eddsa_circuit_with_config(CircuitConfig::standard_ecc_config())
     }
 
     #[test]
     #[ignore]
-    fn test_ecdsa_circuit_wide() -> Result<()> {
-        test_ecdsa_circuit_with_config(CircuitConfig::wide_ecc_config())
+    fn test_eddsa_circuit_wide() -> Result<()> {
+        test_eddsa_circuit_with_config(CircuitConfig::wide_ecc_config())
     }
 }

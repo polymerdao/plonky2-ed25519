@@ -45,22 +45,6 @@ pub const SAMPLE_PK1: AffinePoint<Ed25519> = AffinePoint {
 };
 
 // "test message"
-pub const SAMPLE_H1: Ed25519Scalar = Ed25519Scalar([
-    0xf664bfe815b3f691,
-    0x677f3f53d9def3ed,
-    0xc75422b41eb07187,
-    0x0ab087fb4e3439bd,
-]);
-
-// "plonky2"
-pub const SAMPLE_H2: Ed25519Scalar = Ed25519Scalar([
-    0x143b2cc9c13f8696,
-    0x2a8ccb64b8a95963,
-    0x94c5b08bb85433d1,
-    0x02c2c41397871be1,
-]);
-
-// "test message"
 pub const SAMPLE_SIG1: EDDSASignature<Ed25519> = EDDSASignature {
     r: AffinePoint {
         x: Ed25519Base([
@@ -156,7 +140,7 @@ mod tests {
     };
 
     #[test]
-    fn test_ecdsa_native() {
+    fn test_eddsa_native() {
         let result = verify_message(
             SAMPLE_MSG1.as_bytes(),
             SAMPLE_SIGV1.as_slice(),
