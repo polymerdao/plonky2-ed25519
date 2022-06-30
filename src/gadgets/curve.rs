@@ -1,8 +1,15 @@
+use curve25519_dalek::edwards::CompressedEdwardsY;
+use num::BigUint;
 use plonky2::hash::hash_types::RichField;
-use plonky2::iop::target::BoolTarget;
+use plonky2::iop::generator::{GeneratedValues, SimpleGenerator};
+use plonky2::iop::target::{BoolTarget, Target};
+use plonky2::iop::witness::{PartitionWitness, Witness};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
+use plonky2_ecdsa::gadgets::biguint::buffer_set_biguint_target;
 use plonky2_field::extension::Extendable;
 use plonky2_field::types::Field;
+use plonky2_sha512::circuit::biguint_to_bits_target;
+use std::marker::PhantomData;
 
 use crate::curve::curve_types::{AffinePoint, Curve, CurveScalar};
 use crate::gadgets::nonnative::{CircuitBuilderNonNative, NonNativeTarget};
@@ -69,6 +76,10 @@ pub trait CircuitBuilderCurve<F: RichField + Extendable<D>, const D: usize> {
         p: &AffinePointTarget<C>,
         n: &NonNativeTarget<C::ScalarField>,
     ) -> AffinePointTarget<C>;
+
+    fn point_compress<C: Curve>(&mut self, p: &AffinePointTarget<C>) -> Vec<BoolTarget>;
+
+    fn point_decompress<C: Curve>(&mut self, p: &Vec<BoolTarget>) -> AffinePointTarget<C>;
 }
 
 impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderCurve<F, D>
@@ -264,6 +275,84 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderCurve<F, D>
         result = self.curve_add(&result, &neg_r);
 
         result
+    }
+
+    // A point
+    //    (x,y) is represented in extended homogeneous coordinates (X, Y, Z,
+    //    T), with x = X/Z, y = Y/Z, x * y = T/Z.
+    // def point_compress(P):
+    //     zinv = modp_inv(P[2])
+    //     x = P[0] * zinv % p
+    //     y = P[1] * zinv % p
+    //     return int.to_bytes(y | ((x & 1) << 255), 32, "little")
+    // If Z=1,
+    //     x = P[0]
+    //     y = P[1]
+    //     return int.to_bytes(y | ((x & 1) << 255), 32, "little")
+    fn point_compress<C: Curve>(&mut self, p: &AffinePointTarget<C>) -> Vec<BoolTarget> {
+        let mut bits = biguint_to_bits_target::<F, D, 8>(self, &p.y.value);
+        let x_bits_low_32 = self.split_le_base::<8>(p.x.value.get_limb(0).0, 32);
+
+        bits[0] = BoolTarget::new_unsafe(self.mul(bits[0].target, x_bits_low_32[32]));
+        bits
+    }
+
+    fn point_decompress<C: Curve>(&mut self, pv: &Vec<BoolTarget>) -> AffinePointTarget<C> {
+        let p = self.add_virtual_affine_point_target();
+
+        self.add_simple_generator(CurvePointDecompressionGenerator::<F, D, C> {
+            pv: pv.clone(),
+            p: p.clone(),
+            _phantom: PhantomData,
+        });
+
+        let pv2 = self.point_compress(&p);
+        for i in 0..256 {
+            self.connect(pv[i].target, pv2[i].target);
+        }
+        p
+    }
+}
+
+#[derive(Debug)]
+struct CurvePointDecompressionGenerator<F: RichField + Extendable<D>, const D: usize, C: Curve> {
+    pv: Vec<BoolTarget>,
+    p: AffinePointTarget<C>,
+    _phantom: PhantomData<F>,
+}
+
+impl<F: RichField + Extendable<D>, const D: usize, C: Curve> SimpleGenerator<F>
+    for CurvePointDecompressionGenerator<F, D, C>
+{
+    fn dependencies(&self) -> Vec<Target> {
+        self.pv.iter().cloned().map(|l| l.target).collect()
+    }
+
+    fn run_once(&self, witness: &PartitionWitness<F>, out_buffer: &mut GeneratedValues<F>) {
+        let mut bits = Vec::new();
+        for i in 0..256 {
+            bits.push(witness.get_bool_target(self.pv[i].clone()));
+        }
+        let mut s: [u8; 32] = [0; 32];
+        for i in 0..32 {
+            for j in 0..8 {
+                if bits[i * 32 + j] {
+                    s[31 - i] += 1 << (7 - j);
+                }
+            }
+        }
+
+        let compressed = CompressedEdwardsY(s);
+        let point = compressed.decompress().unwrap();
+
+        println!("{:?}", point.X.to_bytes());
+        println!("{:?}", point.Y.to_bytes());
+
+        let x_biguint = BigUint::from_bytes_be(&point.X.to_bytes());
+        let y_biguint = BigUint::from_bytes_be(&point.Y.to_bytes());
+
+        buffer_set_biguint_target(out_buffer, &self.p.x.value, &x_biguint);
+        buffer_set_biguint_target(out_buffer, &self.p.y.value, &y_biguint);
     }
 }
 
@@ -490,6 +579,34 @@ mod tests {
         let randot_doubled = builder.curve_double(&randot);
         let randot_times_two = builder.curve_scalar_mul(&randot, &two_target);
         builder.connect_affine_point(&randot_doubled, &randot_times_two);
+
+        let data = builder.build::<C>();
+        let proof = data.prove(pw).unwrap();
+
+        data.verify(proof)
+    }
+
+    #[test]
+    #[ignore]
+    fn test_point_compress_decompress() -> Result<()> {
+        const D: usize = 2;
+        type C = PoseidonGoldilocksConfig;
+        type F = <C as GenericConfig<D>>::F;
+
+        let config = CircuitConfig::standard_ecc_config();
+
+        let pw = PartialWitness::new();
+        let mut builder = CircuitBuilder::<F, D>::new(config);
+
+        let rando =
+            (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
+        assert!(rando.is_valid());
+        let randot = builder.constant_affine_point(rando);
+
+        let rando_compressed = builder.point_compress(&randot);
+        let rando_decompressed = builder.point_decompress(&rando_compressed);
+
+        builder.connect_affine_point(&randot, &rando_decompressed);
 
         let data = builder.build::<C>();
         let proof = data.prove(pw).unwrap();

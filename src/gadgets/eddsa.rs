@@ -53,6 +53,7 @@ pub fn make_verify_circuits<F: RichField + Extendable<D>, const D: usize>(
         builder.connect(sha512.message[256 + i].target, pkv[i].target);
     }
 
+    // little endian
     let mut digest_bits = Vec::new();
     for i in 0..64 {
         for j in 0..8 {

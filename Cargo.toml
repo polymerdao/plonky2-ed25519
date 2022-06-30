@@ -11,7 +11,8 @@ plonky2_util = { git = "https://github.com/mir-protocol/plonky2", rev = "dec0765
 plonky2_field = { git = "https://github.com/mir-protocol/plonky2", rev = "dec0765f" }
 plonky2_u32 = { git = "https://github.com/mir-protocol/plonky2", rev = "dec0765f" }
 plonky2_ecdsa = { git = "https://github.com/mir-protocol/plonky2", rev = "dec0765f" }
-plonky2_sha512 = { git = "https://github.com/polymerdao/plonky2-sha512", rev = "23cd5ceb" }
+plonky2_sha512 = { git = "https://github.com/polymerdao/plonky2-sha512", rev = "3ecc0a3a" }
+curve25519-dalek = { git = "https://github.com/polymerdao/curve25519-dalek", rev = "809c5c1d" }
 itertools = "0.10.0"
 rayon = "1.5.1"
 serde = { version = "1.0", features = ["derive"] }
