@@ -290,10 +290,15 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderCurve<F, D>
     //     y = P[1]
     //     return int.to_bytes(y | ((x & 1) << 255), 32, "little")
     fn point_compress<C: Curve>(&mut self, p: &AffinePointTarget<C>) -> Vec<BoolTarget> {
-        let mut bits = biguint_to_bits_target::<F, D, 8>(self, &p.y.value);
-        let x_bits_low_32 = self.split_le_base::<8>(p.x.value.get_limb(0).0, 32);
+        let mut bits = biguint_to_bits_target::<F, D, 2>(self, &p.y.value);
+        let x_bits_low_32 = self.split_le_base::<2>(p.x.value.get_limb(0).0, 32);
 
-        bits[0] = BoolTarget::new_unsafe(self.mul(bits[0].target, x_bits_low_32[32]));
+        // a | b
+        let a = bits[0].target.clone();
+        let b = x_bits_low_32[0];
+        let a_add_b = self.add(a, b);
+        let ab = self.mul(a, b);
+        bits[0] = BoolTarget::new_unsafe(self.sub(a_add_b, ab));
         bits
     }
 
@@ -336,7 +341,7 @@ impl<F: RichField + Extendable<D>, const D: usize, C: Curve> SimpleGenerator<F>
         let mut s: [u8; 32] = [0; 32];
         for i in 0..32 {
             for j in 0..8 {
-                if bits[i * 32 + j] {
+                if bits[i * 8 + j] {
                     s[31 - i] += 1 << (7 - j);
                 }
             }
@@ -345,11 +350,8 @@ impl<F: RichField + Extendable<D>, const D: usize, C: Curve> SimpleGenerator<F>
         let compressed = CompressedEdwardsY(s);
         let point = compressed.decompress().unwrap();
 
-        println!("{:?}", point.X.to_bytes());
-        println!("{:?}", point.Y.to_bytes());
-
-        let x_biguint = BigUint::from_bytes_be(&point.X.to_bytes());
-        let y_biguint = BigUint::from_bytes_be(&point.Y.to_bytes());
+        let x_biguint = BigUint::from_bytes_le(&point.X.to_bytes());
+        let y_biguint = BigUint::from_bytes_le(&point.Y.to_bytes());
 
         buffer_set_biguint_target(out_buffer, &self.p.x.value, &x_biguint);
         buffer_set_biguint_target(out_buffer, &self.p.y.value, &y_biguint);
@@ -587,7 +589,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_point_compress_decompress() -> Result<()> {
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
@@ -601,6 +602,7 @@ mod tests {
         let rando =
             (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
         assert!(rando.is_valid());
+
         let randot = builder.constant_affine_point(rando);
 
         let rando_compressed = builder.point_compress(&randot);
