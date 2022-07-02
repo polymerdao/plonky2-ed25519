@@ -16,7 +16,7 @@ pub struct EDDSATargets {
     pub pk: Vec<BoolTarget>,
 }
 
-fn bits_to_little_256(input_vec: Vec<BoolTarget>) -> Vec<BoolTarget> {
+fn bits_in_le(input_vec: Vec<BoolTarget>) -> Vec<BoolTarget> {
     let mut bits = Vec::new();
     for i in 0..input_vec.len() / 8 {
         for j in 0..8 {
@@ -54,22 +54,22 @@ pub fn make_verify_circuits<F: RichField + Extendable<D>, const D: usize>(
         builder.connect(sha512.message[256 + i].target, pk[i].target);
     }
 
-    let digest_bits = bits_to_little_256(sha512.digest.clone());
+    let digest_bits = bits_in_le(sha512.digest.clone());
     let hash = bits_to_biguint_target(builder, digest_bits);
     let h = builder.reduce(&hash);
 
     let g = builder.constant_affine_point(Ed25519::GENERATOR_AFFINE);
 
-    let s_bits = bits_to_little_256(sig[256..512].to_vec());
+    let s_bits = bits_in_le(sig[256..512].to_vec());
     let s_biguint = bits_to_biguint_target(builder, s_bits);
     let s = builder.biguint_to_nonnative(&s_biguint);
 
-    let pk_bits = bits_to_little_256(pk.clone());
+    let pk_bits = bits_in_le(pk.clone());
     let a = builder.point_decompress(&pk_bits);
 
     let ha = builder.curve_scalar_mul(&a, &h);
 
-    let r_bits = bits_to_little_256(sig[..256].to_vec());
+    let r_bits = bits_in_le(sig[..256].to_vec());
     let r = builder.point_decompress(&r_bits);
 
     let sb = builder.curve_scalar_mul(&g, &s);
