@@ -46,11 +46,11 @@ where
     );
     let data = builder.build::<C>();
 
-    let timing = TimingTree::new("prove", Level::Debug);
+    let timing = TimingTree::new("prove", Level::Info);
     let proof = data.prove(pw).unwrap();
     timing.print();
 
-    let timing = TimingTree::new("verify", Level::Debug);
+    let timing = TimingTree::new("verify", Level::Info);
     data.verify(proof.clone()).expect("verify error");
     timing.print();
 
@@ -122,7 +122,7 @@ where
 
     let data = builder.build::<C>();
 
-    let mut timing = TimingTree::new("prove", Level::Debug);
+    let mut timing = TimingTree::new("prove", Level::Info);
     let proof = prove(&data.prover_only, &data.common, pw, &mut timing)?;
     timing.print();
 
@@ -207,7 +207,7 @@ fn main() -> Result<()> {
     // Initialize logging
     let mut builder = env_logger::Builder::from_default_env();
     builder.format_timestamp(None);
-    builder.filter_level(LevelFilter::Debug);
+    builder.filter_level(LevelFilter::Info);
     builder.try_init()?;
 
     // Run the benchmark
