@@ -118,6 +118,7 @@ mod tests {
     use plonky2::plonk::circuit_builder::CircuitBuilder;
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
+    use rand::Rng;
 
     use crate::curve::eddsa::{SAMPLE_MSG1, SAMPLE_PK1, SAMPLE_SIG1};
     use crate::gadgets::eddsa::{fill_circuits, make_verify_circuits};
@@ -146,6 +147,35 @@ mod tests {
         data.verify(proof)
     }
 
+    fn test_eddsa_circuit_with_config_failure(config: CircuitConfig) {
+        const D: usize = 2;
+        type C = PoseidonGoldilocksConfig;
+        type F = <C as GenericConfig<D>>::F;
+
+        let mut pw = PartialWitness::new();
+        let mut builder = CircuitBuilder::<F, D>::new(config);
+
+        let targets = make_verify_circuits(&mut builder, SAMPLE_MSG1.len());
+
+        let mut rng = rand::thread_rng();
+        let rnd_idx = rng.gen_range(0..64);
+        let mut sig = SAMPLE_SIG1.clone();
+        let rnd_value = rng.gen_range(1..=255);
+        sig[rnd_idx] += rnd_value;
+        fill_circuits::<F, D>(
+            &mut pw,
+            SAMPLE_MSG1.as_bytes(),
+            sig.as_slice(),
+            SAMPLE_PK1.as_slice(),
+            &targets,
+        );
+
+        dbg!(builder.num_gates());
+        let data = builder.build::<C>();
+        let proof = data.prove(pw).unwrap();
+        data.verify(proof).expect("verify error");
+    }
+
     #[test]
     #[ignore]
     fn test_eddsa_circuit_narrow() -> Result<()> {
@@ -156,5 +186,11 @@ mod tests {
     #[ignore]
     fn test_eddsa_circuit_wide() -> Result<()> {
         test_eddsa_circuit_with_config(CircuitConfig::wide_ecc_config())
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_eddsa_circuit_failure() {
+        test_eddsa_circuit_with_config_failure(CircuitConfig::wide_ecc_config());
     }
 }
