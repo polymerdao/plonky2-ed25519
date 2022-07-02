@@ -14,12 +14,9 @@ use plonky2::plonk::config::{AlgebraicHasher, GenericConfig, Hasher, PoseidonGol
 use plonky2::plonk::proof::{CompressedProofWithPublicInputs, ProofWithPublicInputs};
 use plonky2::plonk::prover::prove;
 use plonky2::util::timing::TimingTree;
-use plonky2_ed25519::curve::curve_types::AffinePoint;
-use plonky2_ed25519::curve::ed25519::Ed25519;
 use plonky2_ed25519::curve::eddsa::{
-    EDDSASignature, SAMPLE_MSG1, SAMPLE_MSG2, SAMPLE_PKV1, SAMPLE_SIGV1, SAMPLE_SIGV2,
+    SAMPLE_MSG1, SAMPLE_MSG2, SAMPLE_PK1, SAMPLE_SIG1, SAMPLE_SIG2,
 };
-use plonky2_ed25519::curve::eddsa::{SAMPLE_PK1, SAMPLE_SIG1, SAMPLE_SIG2};
 use plonky2_ed25519::gadgets::eddsa::{fill_circuits, make_verify_circuits};
 use plonky2_field::extension::Extendable;
 
@@ -33,8 +30,6 @@ fn prove_ed25519<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const
     msg: &[u8],
     sigv: &[u8],
     pkv: &[u8],
-    sig: EDDSASignature<Ed25519>,
-    pk: AffinePoint<Ed25519>,
 ) -> Result<ProofTuple<F, C, D>>
 where
     [(); C::Hasher::HASH_SIZE]:,
@@ -43,7 +38,7 @@ where
 
     let targets = make_verify_circuits(&mut builder, msg.len());
     let mut pw = PartialWitness::new();
-    fill_circuits::<F, D>(&mut pw, msg, sigv, pkv, sig, pk, &targets);
+    fill_circuits::<F, D>(&mut pw, msg, sigv, pkv, &targets);
 
     println!(
         "Constructing inner proof with {} gates",
@@ -145,18 +140,14 @@ fn benchmark() -> Result<()> {
 
     let proof1 = prove_ed25519(
         SAMPLE_MSG1.as_bytes(),
-        SAMPLE_SIGV1.as_slice(),
-        SAMPLE_PKV1.as_slice(),
-        SAMPLE_SIG1,
-        SAMPLE_PK1,
+        SAMPLE_SIG1.as_slice(),
+        SAMPLE_PK1.as_slice(),
     )
     .expect("prove error 1");
     let proof2 = prove_ed25519(
         SAMPLE_MSG2.as_bytes(),
-        SAMPLE_SIGV2.as_slice(),
-        SAMPLE_PKV1.as_slice(),
-        SAMPLE_SIG2,
-        SAMPLE_PK1,
+        SAMPLE_SIG2.as_slice(),
+        SAMPLE_PK1.as_slice(),
     )
     .expect("prove error 2");
 

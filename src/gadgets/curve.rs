@@ -1,5 +1,3 @@
-use curve25519_dalek::edwards::CompressedEdwardsY;
-use num::BigUint;
 use plonky2::hash::hash_types::RichField;
 use plonky2::iop::generator::{GeneratedValues, SimpleGenerator};
 use plonky2::iop::target::{BoolTarget, Target};
@@ -7,11 +5,12 @@ use plonky2::iop::witness::{PartitionWitness, Witness};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2_ecdsa::gadgets::biguint::buffer_set_biguint_target;
 use plonky2_field::extension::Extendable;
-use plonky2_field::types::Field;
+use plonky2_field::types::{Field, PrimeField};
 use plonky2_sha512::circuit::biguint_to_bits_target;
 use std::marker::PhantomData;
 
 use crate::curve::curve_types::{AffinePoint, Curve, CurveScalar};
+use crate::curve::eddsa::point_decompress;
 use crate::gadgets::nonnative::{CircuitBuilderNonNative, NonNativeTarget};
 
 /// A Target representing an affine point on the curve `C`. We use incomplete arithmetic for efficiency,
@@ -293,9 +292,9 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderCurve<F, D>
         let mut bits = biguint_to_bits_target::<F, D, 2>(self, &p.y.value);
         let x_bits_low_32 = self.split_le_base::<2>(p.x.value.get_limb(0).0, 32);
 
-        // a | b
         let a = bits[0].target.clone();
         let b = x_bits_low_32[0];
+        // a | b = a + b - a * b
         let a_add_b = self.add(a, b);
         let ab = self.mul(a, b);
         bits[0] = BoolTarget::new_unsafe(self.sub(a_add_b, ab));
@@ -303,6 +302,7 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderCurve<F, D>
     }
 
     fn point_decompress<C: Curve>(&mut self, pv: &Vec<BoolTarget>) -> AffinePointTarget<C> {
+        assert_eq!(pv.len(), 256);
         let p = self.add_virtual_affine_point_target();
 
         self.add_simple_generator(CurvePointDecompressionGenerator::<F, D, C> {
@@ -346,15 +346,10 @@ impl<F: RichField + Extendable<D>, const D: usize, C: Curve> SimpleGenerator<F>
                 }
             }
         }
+        let point = point_decompress(s.as_slice());
 
-        let compressed = CompressedEdwardsY(s);
-        let point = compressed.decompress().unwrap();
-
-        let x_biguint = BigUint::from_bytes_le(&point.X.to_bytes());
-        let y_biguint = BigUint::from_bytes_le(&point.Y.to_bytes());
-
-        buffer_set_biguint_target(out_buffer, &self.p.x.value, &x_biguint);
-        buffer_set_biguint_target(out_buffer, &self.p.y.value, &y_biguint);
+        buffer_set_biguint_target(out_buffer, &self.p.x.value, &point.x.to_canonical_biguint());
+        buffer_set_biguint_target(out_buffer, &self.p.y.value, &point.y.to_canonical_biguint());
     }
 }
 
