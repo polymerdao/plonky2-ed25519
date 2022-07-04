@@ -8,6 +8,8 @@ use plonky2_sha512::circuit::{array_to_bits, bits_to_biguint_target, make_circui
 use crate::curve::curve_types::Curve;
 use crate::curve::ed25519::Ed25519;
 use crate::gadgets::curve::CircuitBuilderCurve;
+use crate::gadgets::curve_fixed_base::fixed_base_curve_mul_circuit;
+use crate::gadgets::curve_windowed_mul::CircuitBuilderWindowedMul;
 use crate::gadgets::nonnative::CircuitBuilderNonNative;
 
 pub struct EDDSATargets {
@@ -58,8 +60,6 @@ pub fn make_verify_circuits<F: RichField + Extendable<D>, const D: usize>(
     let hash = bits_to_biguint_target(builder, digest_bits);
     let h = builder.reduce(&hash);
 
-    let g = builder.constant_affine_point(Ed25519::GENERATOR_AFFINE);
-
     let s_bits = bits_in_le(sig[256..512].to_vec());
     let s_biguint = bits_to_biguint_target(builder, s_bits);
     let s = builder.biguint_to_nonnative(&s_biguint);
@@ -67,12 +67,12 @@ pub fn make_verify_circuits<F: RichField + Extendable<D>, const D: usize>(
     let pk_bits = bits_in_le(pk.clone());
     let a = builder.point_decompress(&pk_bits);
 
-    let ha = builder.curve_scalar_mul(&a, &h);
+    let ha = builder.curve_scalar_mul_windowed(&a, &h);
 
     let r_bits = bits_in_le(sig[..256].to_vec());
     let r = builder.point_decompress(&r_bits);
 
-    let sb = builder.curve_scalar_mul(&g, &s);
+    let sb = fixed_base_curve_mul_circuit(builder, Ed25519::GENERATOR_AFFINE, &s);
     let rhs = builder.curve_add(&r, &ha);
     builder.connect_affine_point(&sb, &rhs);
 
@@ -189,6 +189,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     #[should_panic]
     fn test_eddsa_circuit_failure() {
         test_eddsa_circuit_with_config_failure(CircuitConfig::wide_ecc_config());

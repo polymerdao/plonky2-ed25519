@@ -85,7 +85,8 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderCurve<F, D>
     for CircuitBuilder<F, D>
 {
     fn constant_affine_point<C: Curve>(&mut self, point: AffinePoint<C>) -> AffinePointTarget<C> {
-        debug_assert!(!point.zero);
+        // TODO: Why not zero here?
+        // debug_assert!(!point.zero);
         AffinePointTarget {
             x: self.constant_nonnative(point.x),
             y: self.constant_nonnative(point.y),
