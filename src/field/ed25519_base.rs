@@ -107,7 +107,7 @@ impl Field for Ed25519Base {
         Some(self.exp_biguint(&(Self::order() - BigUint::one() - BigUint::one())))
     }
 
-    fn from_biguint(val: BigUint) -> Self {
+    fn from_noncanonical_biguint(val: BigUint) -> Self {
         Self(
             val.to_u64_digits()
                 .into_iter()
@@ -134,7 +134,7 @@ impl Field for Ed25519Base {
     }
 
     fn rand_from_rng<R: Rng>(rng: &mut R) -> Self {
-        Self::from_biguint(rng.gen_biguint_below(&Self::order()))
+        Self::from_noncanonical_biguint(rng.gen_biguint_below(&Self::order()))
     }
 }
 
@@ -156,7 +156,7 @@ impl Neg for Ed25519Base {
         if self.is_zero() {
             Self::ZERO
         } else {
-            Self::from_biguint(Self::order() - self.to_canonical_biguint())
+            Self::from_noncanonical_biguint(Self::order() - self.to_canonical_biguint())
         }
     }
 }
@@ -170,7 +170,7 @@ impl Add for Ed25519Base {
         if result >= Self::order() {
             result -= Self::order();
         }
-        Self::from_biguint(result)
+        Self::from_noncanonical_biguint(result)
     }
 }
 
@@ -209,7 +209,7 @@ impl Mul for Ed25519Base {
 
     #[inline]
     fn mul(self, rhs: Self) -> Self {
-        Self::from_biguint(
+        Self::from_noncanonical_biguint(
             (self.to_canonical_biguint() * rhs.to_canonical_biguint()).mod_floor(&Self::order()),
         )
     }

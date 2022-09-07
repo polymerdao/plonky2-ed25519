@@ -44,8 +44,8 @@ pub fn point_decompress(s: &[u8]) -> AffinePoint<Ed25519> {
     let x_biguint = BigUint::from_bytes_le(&point.get_x().to_bytes());
     let y_biguint = BigUint::from_bytes_le(&point.get_y().to_bytes());
     AffinePoint::nonzero(
-        Ed25519Base::from_biguint(x_biguint),
-        Ed25519Base::from_biguint(y_biguint),
+        Ed25519Base::from_noncanonical_biguint(x_biguint),
+        Ed25519Base::from_noncanonical_biguint(y_biguint),
     )
 }
 
@@ -61,12 +61,12 @@ pub fn verify_message(msg: &[u8], sigv: &[u8], pkv: &[u8]) -> bool {
     let hash = hasher.finalize();
     let h_big_int = BigUint::from_bytes_le(hash.as_slice());
     let h_mod_25519 = h_big_int.mod_floor(&Ed25519Scalar::order());
-    let h = Ed25519Scalar::from_biguint(h_mod_25519);
+    let h = Ed25519Scalar::from_noncanonical_biguint(h_mod_25519);
 
     let pk = point_decompress(pkv);
     assert!(pk.is_valid());
     let r = point_decompress(&sigv[..32]);
-    let s = Ed25519Scalar::from_biguint(BigUint::from_bytes_le(&sigv[32..]));
+    let s = Ed25519Scalar::from_noncanonical_biguint(BigUint::from_bytes_le(&sigv[32..]));
 
     let g = Ed25519::GENERATOR_PROJECTIVE;
     let sb = mul_naive(s, g);

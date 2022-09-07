@@ -1,13 +1,14 @@
+use std::marker::PhantomData;
+
 use plonky2::hash::hash_types::RichField;
 use plonky2::iop::generator::{GeneratedValues, SimpleGenerator};
 use plonky2::iop::target::{BoolTarget, Target};
 use plonky2::iop::witness::{PartitionWitness, Witness};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
-use plonky2_ecdsa::gadgets::biguint::buffer_set_biguint_target;
+use plonky2_ecdsa::gadgets::biguint::GeneratedValuesBigUint;
 use plonky2_field::extension::Extendable;
 use plonky2_field::types::{Field, PrimeField};
 use plonky2_sha512::circuit::biguint_to_bits_target;
-use std::marker::PhantomData;
 
 use crate::curve::curve_types::{AffinePoint, Curve, CurveScalar};
 use crate::curve::eddsa::point_decompress;
@@ -349,8 +350,8 @@ impl<F: RichField + Extendable<D>, const D: usize, C: Curve> SimpleGenerator<F>
         }
         let point = point_decompress(s.as_slice());
 
-        buffer_set_biguint_target(out_buffer, &self.p.x.value, &point.x.to_canonical_biguint());
-        buffer_set_biguint_target(out_buffer, &self.p.y.value, &point.y.to_canonical_biguint());
+        out_buffer.set_biguint_target(&self.p.x.value, &point.x.to_canonical_biguint());
+        out_buffer.set_biguint_target(&self.p.y.value, &point.y.to_canonical_biguint());
     }
 }
 
