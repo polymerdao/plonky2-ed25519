@@ -1,17 +1,15 @@
-use std::convert::TryInto;
-use std::fmt;
-use std::fmt::{Debug, Display, Formatter};
-use std::hash::{Hash, Hasher};
-use std::iter::{Product, Sum};
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use core::fmt::{self, Debug, Display, Formatter};
+use core::hash::{Hash, Hasher};
+use core::iter::{Product, Sum};
+use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::vec::Vec;
 
 use itertools::Itertools;
-use num::bigint::{BigUint, RandBigInt};
+use num::bigint::BigUint;
 use num::{Integer, One};
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use plonky2_field::types::{Field, PrimeField};
+use plonky2_field::types::{Field, PrimeField, Sample};
 
 /// The order of the Ed25519 elliptic curve is
 /// ```ignore
@@ -62,6 +60,17 @@ impl Display for Ed25519Scalar {
 impl Debug for Ed25519Scalar {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Debug::fmt(&self.to_canonical_biguint(), f)
+    }
+}
+
+impl Sample for Ed25519Scalar {
+    #[inline]
+    fn sample<R>(rng: &mut R) -> Self
+    where
+        R: rand::RngCore + ?Sized,
+    {
+        use num::bigint::RandBigInt;
+        Self::from_noncanonical_biguint(rng.gen_biguint_below(&Self::order()))
     }
 }
 
@@ -130,10 +139,6 @@ impl Field for Ed25519Scalar {
     #[inline]
     fn from_noncanonical_u96(n: (u64, u32)) -> Self {
         Self([n.0, n.1 as u64, 0, 0])
-    }
-
-    fn rand_from_rng<R: Rng>(rng: &mut R) -> Self {
-        Self::from_noncanonical_biguint(rng.gen_biguint_below(&Self::order()))
     }
 }
 

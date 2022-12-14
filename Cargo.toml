@@ -6,24 +6,24 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-plonky2 = { git = "https://github.com/mir-protocol/plonky2", rev = "8c275c49" }
-plonky2_util = { git = "https://github.com/mir-protocol/plonky2", rev = "8c275c49" }
-plonky2_field = { git = "https://github.com/mir-protocol/plonky2", rev = "8c275c49" }
-plonky2_u32 = { git = "https://github.com/mir-protocol/plonky2", rev = "8c275c49" }
-plonky2_ecdsa = { git = "https://github.com/mir-protocol/plonky2", rev = "8c275c49" }
-plonky2_sha512 = { git = "https://github.com/polymerdao/plonky2-sha512", rev = "843a2074" }
+plonky2 = { git = "https://github.com/polymerdao/plonky2", rev = "4cb0b48df1d227d5461a4c28ed025aaea64e2e62" }
+plonky2_util = { git = "https://github.com/polymerdao/plonky2", rev = "4cb0b48df1d227d5461a4c28ed025aaea64e2e62" }
+plonky2_field = { git = "https://github.com/polymerdao/plonky2", rev = "4cb0b48df1d227d5461a4c28ed025aaea64e2e62" }
+plonky2_u32 = { git = "https://github.com/polymerdao/plonky2", rev = "4cb0b48df1d227d5461a4c28ed025aaea64e2e62" }
+plonky2_ecdsa = { git = "https://github.com/polymerdao/plonky2", rev = "4cb0b48df1d227d5461a4c28ed025aaea64e2e62" }
+plonky2_sha512 = { git = "https://github.com/polymerdao/plonky2-sha512", rev = "6504a307448fdcc8c2daf000150a1f5691a4f8ef" }
 curve25519-dalek = { git = "https://github.com/polymerdao/curve25519-dalek", rev = "ed02bb5a", features = ["default"] }
-itertools = "0.10.0"
+itertools = { version = "0.10.0", default-features = false, features = ["use_alloc"] }
+num = { version = "0.4", default-features = false, features = ["alloc", "rand"] }
 rayon = "1.5.1"
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] }
 anyhow = "1.0.40"
-env_logger = "0.9.0"
+env_logger = "0.10.0"
 log = "0.4.14"
-num = { version = "0.4", features = ["rand"] }
-rand = "0.8.4"
+rand = { version = "0.8.5", default-features = false, features = ["getrandom"] }
 rand_chacha = "0.3.1"
 unroll = "0.1.5"
-keccak-hash = "0.8.0"
+keccak-hash = "0.10.0"
 static_assertions = "1.1.0"
 sha2 = "0.10"
 

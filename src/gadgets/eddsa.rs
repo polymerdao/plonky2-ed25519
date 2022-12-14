@@ -1,6 +1,6 @@
 use plonky2::hash::hash_types::RichField;
 use plonky2::iop::target::BoolTarget;
-use plonky2::iop::witness::{PartialWitness, Witness};
+use plonky2::iop::witness::{PartialWitness, WitnessWrite};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2_field::extension::Extendable;
 use plonky2_sha512::circuit::{array_to_bits, bits_to_biguint_target, make_circuits};
@@ -44,10 +44,10 @@ pub fn make_verify_circuits<F: RichField + Extendable<D>, const D: usize>(
         msg.push(sha512.message[512 + i]);
     }
     for _ in 0..512 {
-        sig.push(builder.add_virtual_bool_target());
+        sig.push(builder.add_virtual_bool_target_unsafe());
     }
     for _ in 0..256 {
-        pk.push(builder.add_virtual_bool_target());
+        pk.push(builder.add_virtual_bool_target_unsafe());
     }
     for i in 0..256 {
         builder.connect(sha512.message[i].target, sig[i].target);

@@ -71,8 +71,8 @@ mod tests {
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
     use plonky2_ecdsa::gadgets::biguint::WitnessBigUint;
-    use plonky2_field::types::Field;
     use plonky2_field::types::PrimeField;
+    use plonky2_field::types::Sample;
 
     use crate::curve::curve_types::{Curve, CurveScalar};
     use crate::curve::ed25519::Ed25519;

@@ -4,7 +4,7 @@ use num::{BigUint, Integer, One, Zero};
 use plonky2::hash::hash_types::RichField;
 use plonky2::iop::generator::{GeneratedValues, SimpleGenerator};
 use plonky2::iop::target::{BoolTarget, Target};
-use plonky2::iop::witness::PartitionWitness;
+use plonky2::iop::witness::{PartitionWitness, WitnessWrite};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2_field::types::PrimeField;
 use plonky2_field::{extension::Extendable, types::Field};
@@ -183,7 +183,7 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderNonNative<F, D>
         b: &NonNativeTarget<FF>,
     ) -> NonNativeTarget<FF> {
         let sum = self.add_virtual_nonnative_target::<FF>();
-        let overflow = self.add_virtual_bool_target();
+        let overflow = self.add_virtual_bool_target_unsafe();
 
         self.add_simple_generator(NonNativeAdditionGenerator::<F, D, FF> {
             a: a.clone(),
@@ -282,7 +282,7 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderNonNative<F, D>
         b: &NonNativeTarget<FF>,
     ) -> NonNativeTarget<FF> {
         let diff = self.add_virtual_nonnative_target::<FF>();
-        let overflow = self.add_virtual_bool_target();
+        let overflow = self.add_virtual_bool_target_unsafe();
 
         self.add_simple_generator(NonNativeSubtractionGenerator::<F, D, FF> {
             a: a.clone(),
@@ -646,7 +646,7 @@ mod tests {
     use plonky2::plonk::circuit_builder::CircuitBuilder;
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
-    use plonky2_field::types::{Field, PrimeField};
+    use plonky2_field::types::{Field, PrimeField, Sample};
 
     use crate::field::ed25519_base::Ed25519Base;
     use crate::gadgets::nonnative::CircuitBuilderNonNative;

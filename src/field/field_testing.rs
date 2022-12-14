@@ -2,8 +2,11 @@
 macro_rules! test_field_arithmetic {
     ($field:ty) => {
         mod field_arithmetic {
+            use std::vec::Vec;
+
             use num::bigint::BigUint;
-            use plonky2_field::types::Field;
+            use plonky2_field::types::{Field, Sample};
+            use rand::rngs::OsRng;
             use rand::Rng;
 
             #[test]
@@ -67,7 +70,7 @@ macro_rules! test_field_arithmetic {
             fn exponentiation_large() {
                 type F = $field;
 
-                let mut rng = rand::thread_rng();
+                let mut rng = OsRng;
 
                 let base = F::rand();
                 let pow = BigUint::from(rng.gen::<u64>());

@@ -7,7 +7,7 @@ use plonky2::iop::witness::{PartitionWitness, Witness};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2_ecdsa::gadgets::biguint::GeneratedValuesBigUint;
 use plonky2_field::extension::Extendable;
-use plonky2_field::types::{Field, PrimeField};
+use plonky2_field::types::{Field, PrimeField, Sample};
 use plonky2_sha512::circuit::biguint_to_bits_target;
 
 use crate::curve::curve_types::{AffinePoint, Curve, CurveScalar};
@@ -364,7 +364,7 @@ mod tests {
     use plonky2::plonk::circuit_builder::CircuitBuilder;
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
-    use plonky2_field::types::Field;
+    use plonky2_field::types::{Field, Sample};
 
     use crate::curve::curve_types::{AffinePoint, Curve, CurveScalar};
     use crate::curve::ed25519::Ed25519;

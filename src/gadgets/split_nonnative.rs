@@ -100,7 +100,7 @@ mod tests {
     use plonky2::plonk::circuit_builder::CircuitBuilder;
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
-    use plonky2_field::types::Field;
+    use plonky2_field::types::Sample;
 
     use crate::field::ed25519_scalar::Ed25519Scalar;
     use crate::gadgets::nonnative::{CircuitBuilderNonNative, NonNativeTarget};
