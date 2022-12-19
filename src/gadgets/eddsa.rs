@@ -41,13 +41,16 @@ pub fn make_verify_circuits<F: RichField + Extendable<D>, const D: usize>(
     let mut sig = Vec::new();
     let mut pk = Vec::new();
     for i in 0..msg_len_in_bits {
+        builder.register_public_input(sha512.message[512 + i].target);
         msg.push(sha512.message[512 + i]);
     }
     for _ in 0..512 {
         sig.push(builder.add_virtual_bool_target_unsafe());
     }
     for _ in 0..256 {
-        pk.push(builder.add_virtual_bool_target_unsafe());
+        let t = builder.add_virtual_bool_target_unsafe();
+        builder.register_public_input(t.target);
+        pk.push(t);
     }
     for i in 0..256 {
         builder.connect(sha512.message[i].target, sig[i].target);

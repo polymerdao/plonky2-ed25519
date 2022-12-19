@@ -15,12 +15,17 @@ use plonky2::plonk::circuit_data::{
 use plonky2::plonk::config::{AlgebraicHasher, GenericConfig, Hasher, PoseidonGoldilocksConfig};
 use plonky2::plonk::proof::{CompressedProofWithPublicInputs, ProofWithPublicInputs};
 use plonky2::plonk::prover::prove;
+use plonky2::recursion::tree_recursion::{
+    check_tree_proof_verifier_data, common_data_for_recursion, set_tree_recursion_leaf_data_target,
+    TreeRecursionLeafData,
+};
 use plonky2::util::timing::TimingTree;
 use plonky2_ed25519::curve::eddsa::{
     SAMPLE_MSG1, SAMPLE_MSG2, SAMPLE_PK1, SAMPLE_SIG1, SAMPLE_SIG2,
 };
 use plonky2_ed25519::gadgets::eddsa::{fill_circuits, make_verify_circuits};
 use plonky2_field::extension::Extendable;
+use plonky2_field::goldilocks_field::GoldilocksField;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -59,7 +64,7 @@ where
     data.verify(proof.clone()).expect("verify error");
     timing.print();
 
-    test_serialization(&proof, &data.verifier_only, &data.common)?;
+    // test_serialization(&proof, &data.verifier_only, &data.common)?;
     Ok((proof, data.verifier_only, data.common))
 }
 
@@ -259,13 +264,31 @@ fn main() -> Result<()> {
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
-        let (proof, _, _) = prove_ed25519::<F, C, D>(
+        let (inner_proof, inner_vd, inner_cd) = prove_ed25519::<F, C, D>(
             decode_hex(&args.msg)?.as_slice(),
             decode_hex(&args.sig)?.as_slice(),
             decode_hex(&args.pk)?.as_slice(),
         )?;
 
-        let proof_bytes = proof.to_bytes();
+        // recursively prove in a leaf
+        let standard_config = CircuitConfig::standard_recursion_config();
+        let mut common_data = common_data_for_recursion::<GoldilocksField, C, D>();
+        let mut builder = CircuitBuilder::<F, D>::new(standard_config.clone());
+        let leaf_targets = builder.tree_recursion_leaf::<C>(inner_cd, &mut common_data)?;
+        let data = builder.build::<C>();
+        let leaf_vd = &data.verifier_only;
+        let mut pw = PartialWitness::new();
+        let leaf_data = TreeRecursionLeafData {
+            inner_proof: &inner_proof,
+            inner_verifier_data: &inner_vd,
+            verifier_data: leaf_vd,
+        };
+        set_tree_recursion_leaf_data_target(&mut pw, &leaf_targets, &leaf_data)?;
+        let leaf_proof = data.prove(pw)?;
+        check_tree_proof_verifier_data(&leaf_proof, leaf_vd, &common_data)
+            .expect("Leaf public inputs do not match its verifier data");
+
+        let proof_bytes = leaf_proof.to_bytes();
         info!("Export proof: {} bytes", proof_bytes.len());
 
         println!(
