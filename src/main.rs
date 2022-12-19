@@ -2,6 +2,8 @@
 #![feature(generic_const_exprs)]
 
 use anyhow::Result;
+use clap::Parser;
+use core::num::ParseIntError;
 use log::{info, Level, LevelFilter};
 use plonky2::gates::noop::NoopGate;
 use plonky2::hash::hash_types::RichField;
@@ -19,6 +21,9 @@ use plonky2_ed25519::curve::eddsa::{
 };
 use plonky2_ed25519::gadgets::eddsa::{fill_circuits, make_verify_circuits};
 use plonky2_field::extension::Extendable;
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
 
 type ProofTuple<F, C, const D: usize> = (
     ProofWithPublicInputs<F, C, D>,
@@ -210,6 +215,35 @@ where
     Ok(())
 }
 
+#[derive(Parser)]
+struct Cli {
+    #[arg(short, long, default_value_t = 0)]
+    benchmark: u8,
+    #[arg(short, long, default_value = "./ed25519.proof")]
+    output_path: PathBuf,
+    #[arg(short, long, default_value = "0123456789ABCDEF")]
+    msg: String,
+    #[arg(
+        short,
+        long,
+        default_value = "9DBB279277D4EFE2E5F114A9AAB25C83FC9509D3B3D3B90929854F5A243AEBCD"
+    )]
+    pk: String,
+    #[arg(
+        short,
+        long,
+        default_value = "2EF7A1AA2FC58D40691236664418ADC903C153ABC0C95D02AC45B436C02081C2B93891B37B17F57C7CDE97B52BBB8F1865C14A92ADA4DC34ED0DE7935346E40E"
+    )]
+    sig: String,
+}
+
+pub fn decode_hex(s: &String) -> Result<Vec<u8>, ParseIntError> {
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16))
+        .collect()
+}
+
 fn main() -> Result<()> {
     // Initialize logging
     let mut builder = env_logger::Builder::from_default_env();
@@ -217,6 +251,35 @@ fn main() -> Result<()> {
     builder.filter_level(LevelFilter::Info);
     builder.try_init()?;
 
-    // Run the benchmark
-    benchmark()
+    let args = Cli::parse();
+    if args.benchmark == 1 {
+        // Run the benchmark
+        benchmark()
+    } else {
+        const D: usize = 2;
+        type C = PoseidonGoldilocksConfig;
+        type F = <C as GenericConfig<D>>::F;
+        let (proof, _, _) = prove_ed25519::<F, C, D>(
+            decode_hex(&args.msg)?.as_slice(),
+            decode_hex(&args.sig)?.as_slice(),
+            decode_hex(&args.pk)?.as_slice(),
+        )?;
+
+        let proof_bytes = proof.to_bytes();
+        info!("Export proof: {} bytes", proof_bytes.len());
+
+        println!(
+            "Exporting root proof: {}",
+            args.output_path
+                .clone()
+                .into_os_string()
+                .into_string()
+                .unwrap()
+        );
+        let mut file = File::create(args.output_path)?;
+        file.write_all(&*proof_bytes)
+            .expect("Root proof file write err");
+
+        Ok(())
+    }
 }

@@ -26,6 +26,7 @@ unroll = "0.1.5"
 keccak-hash = "0.10.0"
 static_assertions = "1.1.0"
 sha2 = "0.10"
+clap = { version = "4.0.29", features = ["derive"] }
 
 [profile.release]
 opt-level = 3
