@@ -226,20 +226,12 @@ struct Cli {
     benchmark: u8,
     #[arg(short, long, default_value = "./ed25519.proof")]
     output_path: PathBuf,
-    #[arg(short, long, default_value = "0123456789ABCDEF")]
-    msg: String,
-    #[arg(
-        short,
-        long,
-        default_value = "9DBB279277D4EFE2E5F114A9AAB25C83FC9509D3B3D3B90929854F5A243AEBCD"
-    )]
-    pk: String,
-    #[arg(
-        short,
-        long,
-        default_value = "2EF7A1AA2FC58D40691236664418ADC903C153ABC0C95D02AC45B436C02081C2B93891B37B17F57C7CDE97B52BBB8F1865C14A92ADA4DC34ED0DE7935346E40E"
-    )]
-    sig: String,
+    #[arg(short, long)]
+    msg: Option<String>,
+    #[arg(short, long)]
+    pk: Option<String>,
+    #[arg(short, long)]
+    sig: Option<String>,
 }
 
 pub fn decode_hex(s: &String) -> Result<Vec<u8>, ParseIntError> {
@@ -261,13 +253,18 @@ fn main() -> Result<()> {
         // Run the benchmark
         benchmark()
     } else {
+        if args.sig.is_none() || args.pk.is_none() || args.msg.is_none() {
+            println!("The required arguments were not provided: --msg MSG_IN_HEX  --pk PUBLIC_KEY_IN_HEX  --sig SIGNATURE_IN_HEX");
+            return Ok(());
+        }
+
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
         let (inner_proof, inner_vd, inner_cd) = prove_ed25519::<F, C, D>(
-            decode_hex(&args.msg)?.as_slice(),
-            decode_hex(&args.sig)?.as_slice(),
-            decode_hex(&args.pk)?.as_slice(),
+            decode_hex(&args.msg.unwrap())?.as_slice(),
+            decode_hex(&args.sig.unwrap())?.as_slice(),
+            decode_hex(&args.pk.unwrap())?.as_slice(),
         )?;
 
         // recursively prove in a leaf
@@ -301,7 +298,7 @@ fn main() -> Result<()> {
         );
         let mut file = File::create(args.output_path)?;
         file.write_all(&*proof_bytes)
-            .expect("Root proof file write err");
+            .expect("Leaf proof file write err");
 
         Ok(())
     }
