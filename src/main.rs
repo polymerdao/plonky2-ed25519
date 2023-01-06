@@ -90,6 +90,7 @@ where
         let (inner_proof, inner_vd, inner_cd) = inner1;
         let pt = builder.add_virtual_proof_with_pis::<InnerC>(inner_cd);
         pw.set_proof_with_pis_target(&pt, inner_proof);
+        builder.register_public_inputs(&*pt.public_inputs);
 
         let inner_data = VerifierCircuitTarget {
             constants_sigmas_cap: builder.add_virtual_cap(inner_cd.config.fri_config.cap_height),
@@ -108,6 +109,7 @@ where
         let (inner_proof, inner_vd, inner_cd) = inner2.unwrap();
         let pt = builder.add_virtual_proof_with_pis::<InnerC>(&inner_cd);
         pw.set_proof_with_pis_target(&pt, &inner_proof);
+        builder.register_public_inputs(&*pt.public_inputs);
 
         let inner_data = VerifierCircuitTarget {
             constants_sigmas_cap: builder.add_virtual_cap(inner_cd.config.fri_config.cap_height),
@@ -261,14 +263,20 @@ fn main() -> Result<()> {
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
-        let (inner_proof, inner_vd, inner_cd) = prove_ed25519::<F, C, D>(
+        let eddsa_proof = prove_ed25519::<F, C, D>(
             decode_hex(&args.msg.unwrap())?.as_slice(),
             decode_hex(&args.sig.unwrap())?.as_slice(),
             decode_hex(&args.pk.unwrap())?.as_slice(),
         )?;
+        println!("Num public inputs: {}", eddsa_proof.2.num_public_inputs);
+
+        // TODO: remove this double recursion will cause leaf proving error, why?
+        let standard_config = CircuitConfig::standard_recursion_config();
+        let (inner_proof, inner_vd, inner_cd) =
+            recursive_proof::<F, C, C, D>(&eddsa_proof, None, &standard_config, None)?;
+        println!("Num public inputs: {}", inner_cd.num_public_inputs);
 
         // recursively prove in a leaf
-        let standard_config = CircuitConfig::standard_recursion_config();
         let mut common_data = common_data_for_recursion::<GoldilocksField, C, D>();
         let mut builder = CircuitBuilder::<F, D>::new(standard_config.clone());
         let leaf_targets = builder.tree_recursion_leaf::<C>(inner_cd, &mut common_data)?;
@@ -284,6 +292,8 @@ fn main() -> Result<()> {
         let leaf_proof = data.prove(pw)?;
         check_tree_proof_verifier_data(&leaf_proof, leaf_vd, &common_data)
             .expect("Leaf public inputs do not match its verifier data");
+        data.verify(leaf_proof.clone()).expect("verify error");
+        println!("Num public inputs: {}", common_data.num_public_inputs);
 
         let proof_bytes = leaf_proof.to_bytes();
         info!("Export proof: {} bytes", proof_bytes.len());
