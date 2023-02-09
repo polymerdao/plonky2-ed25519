@@ -1,6 +1,3 @@
-#![allow(incomplete_features)]
-#![feature(generic_const_exprs)]
-
 use anyhow::Result;
 use clap::Parser;
 use core::num::ParseIntError;
