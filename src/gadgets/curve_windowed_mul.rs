@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use num::{BigUint, Zero};
+use num::BigUint;
 use plonky2::hash::hash_types::RichField;
 use plonky2::hash::keccak::KeccakHash;
 use plonky2::iop::target::Target;
@@ -40,7 +40,7 @@ pub trait CircuitBuilderWindowedMul<F: RichField + Extendable<D>, const D: usize
     fn curve_scalar_mul_windowed_part<C: Curve>(
         &mut self,
         num_limbs: usize,
-        init: Option<&AffinePointTarget<C>>,
+        init: &AffinePointTarget<C>,
         p: &AffinePointTarget<C>,
         n: &NonNativeTarget<C::ScalarField>,
     ) -> AffinePointTarget<C>;
@@ -123,13 +123,19 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderWindowedMul<F, 
     ) -> AffinePointTarget<C> {
         let num_limbs = C::ScalarField::BITS / WINDOW_SIZE;
         assert_eq!(num_limbs * WINDOW_SIZE, C::ScalarField::BITS);
-        self.curve_scalar_mul_windowed_part(num_limbs, None, p, n)
+        let init_p = AffinePoint {
+            x: C::BaseField::ZERO,
+            y: C::BaseField::ONE,
+            zero: false,
+        };
+        let init_p_target = self.constant_affine_point(init_p);
+        self.curve_scalar_mul_windowed_part(num_limbs, &init_p_target, p, n)
     }
 
     fn curve_scalar_mul_windowed_part<C: Curve>(
         &mut self,
         num_limbs: usize,
-        init: Option<&AffinePointTarget<C>>,
+        init_p: &AffinePointTarget<C>,
         p: &AffinePointTarget<C>,
         n: &NonNativeTarget<C::ScalarField>,
     ) -> AffinePointTarget<C> {
@@ -165,9 +171,7 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderWindowedMul<F, 
         let to_subtract = self.constant_affine_point(starting_point_multiplied.to_affine());
         let to_add = self.curve_neg(&to_subtract);
         result = self.curve_add(&result, &to_add);
-        if init.is_some() {
-            result = self.curve_add(&result, init.unwrap());
-        }
+        result = self.curve_add(&result, init_p);
 
         result
     }
