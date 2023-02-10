@@ -139,10 +139,12 @@ mod tests {
     use std::ops::Neg;
 
     use anyhow::Result;
+    use log::{Level, LevelFilter};
     use plonky2::iop::witness::PartialWitness;
     use plonky2::plonk::circuit_builder::CircuitBuilder;
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
+    use plonky2::util::timing::TimingTree;
     use plonky2_field::types::{Field, Sample};
     use rand::Rng;
 
@@ -155,13 +157,23 @@ mod tests {
     use crate::gadgets::nonnative::CircuitBuilderNonNative;
 
     #[test]
-    #[ignore]
     fn test_pre_compute_all_d() -> Result<()> {
+        // Initialize logging
+        let mut builder = env_logger::Builder::from_default_env();
+        builder.format_timestamp(None);
+        builder.filter_level(LevelFilter::Info);
+        builder.try_init()?;
+
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
+        type InnerC = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
 
         let config = CircuitConfig::standard_ecc_config();
+        let timing = TimingTree::new("prove_curve_mul_mt", Level::Info);
+        prove_curve_mul_mt::<F, C, InnerC, D>(&config)?;
+        timing.print();
+
         Ok(())
     }
 }

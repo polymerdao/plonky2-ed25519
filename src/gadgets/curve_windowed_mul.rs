@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use num::BigUint;
+use num::{BigUint, Zero};
 use plonky2::hash::hash_types::RichField;
 use plonky2::hash::keccak::KeccakHash;
 use plonky2::iop::target::Target;
@@ -11,7 +11,7 @@ use plonky2_field::extension::Extendable;
 use plonky2_field::types::{Field, Sample};
 use plonky2_u32::gadgets::arithmetic_u32::{CircuitBuilderU32, U32Target};
 
-use crate::curve::curve_types::{Curve, CurveScalar};
+use crate::curve::curve_types::{AffinePoint, Curve, CurveScalar};
 use crate::gadgets::curve::{AffinePointTarget, CircuitBuilderCurve};
 use crate::gadgets::nonnative::NonNativeTarget;
 use crate::gadgets::split_nonnative::CircuitBuilderSplit;
@@ -32,6 +32,15 @@ pub trait CircuitBuilderWindowedMul<F: RichField + Extendable<D>, const D: usize
 
     fn curve_scalar_mul_windowed<C: Curve>(
         &mut self,
+        p: &AffinePointTarget<C>,
+        n: &NonNativeTarget<C::ScalarField>,
+    ) -> AffinePointTarget<C>;
+
+    // returns n(first num_limbs)*p+init
+    fn curve_scalar_mul_windowed_part<C: Curve>(
+        &mut self,
+        num_limbs: usize,
+        init: Option<&AffinePointTarget<C>>,
         p: &AffinePointTarget<C>,
         n: &NonNativeTarget<C::ScalarField>,
     ) -> AffinePointTarget<C>;
@@ -112,6 +121,18 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderWindowedMul<F, 
         p: &AffinePointTarget<C>,
         n: &NonNativeTarget<C::ScalarField>,
     ) -> AffinePointTarget<C> {
+        let num_limbs = C::ScalarField::BITS / WINDOW_SIZE;
+        assert_eq!(num_limbs * WINDOW_SIZE, C::ScalarField::BITS);
+        self.curve_scalar_mul_windowed_part(num_limbs, None, p, n)
+    }
+
+    fn curve_scalar_mul_windowed_part<C: Curve>(
+        &mut self,
+        num_limbs: usize,
+        init: Option<&AffinePointTarget<C>>,
+        p: &AffinePointTarget<C>,
+        n: &NonNativeTarget<C::ScalarField>,
+    ) -> AffinePointTarget<C> {
         let hash_0 = KeccakHash::<25>::hash_no_pad(&[F::ZERO]);
         let hash_0_scalar = C::ScalarField::from_noncanonical_biguint(BigUint::from_bytes_le(
             &GenericHashOut::<F>::to_bytes(&hash_0),
@@ -130,7 +151,7 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderWindowedMul<F, 
         let precomputation = self.precompute_window(p);
         let zero = self.zero();
 
-        let windows = self.split_nonnative_to_4_bit_limbs(n);
+        let windows = &self.split_nonnative_to_4_bit_limbs(n)[0..num_limbs];
         for i in (0..windows.len()).rev() {
             result = self.curve_repeated_double(&result, WINDOW_SIZE);
             let window = windows[i];
@@ -144,6 +165,9 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderWindowedMul<F, 
         let to_subtract = self.constant_affine_point(starting_point_multiplied.to_affine());
         let to_add = self.curve_neg(&to_subtract);
         result = self.curve_add(&result, &to_add);
+        if init.is_some() {
+            result = self.curve_add(&result, init.unwrap());
+        }
 
         result
     }
