@@ -182,10 +182,12 @@ mod tests {
     use std::ops::Neg;
 
     use anyhow::Result;
+    use log::{Level, LevelFilter};
     use plonky2::iop::witness::PartialWitness;
     use plonky2::plonk::circuit_builder::CircuitBuilder;
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
+    use plonky2::util::timing::TimingTree;
     use plonky2_field::types::{Field, Sample};
     use rand::Rng;
 
@@ -233,6 +235,12 @@ mod tests {
     #[test]
     #[ignore]
     fn test_curve_windowed_mul() -> Result<()> {
+        // Initialize logging
+        let mut builder = env_logger::Builder::from_default_env();
+        builder.format_timestamp(None);
+        builder.filter_level(LevelFilter::Info);
+        builder.try_init()?;
+
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
@@ -258,7 +266,10 @@ mod tests {
         builder.connect_affine_point(&neg_five_g_expected, &neg_five_g_actual);
 
         let data = builder.build::<C>();
+        let config = CircuitConfig::standard_ecc_config();
+        let timing = TimingTree::new("prove curve_windowed_mul", Level::Info);
         let proof = data.prove(pw).unwrap();
+        timing.print();
 
         data.verify(proof)
     }
