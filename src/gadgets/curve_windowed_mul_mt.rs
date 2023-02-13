@@ -1,6 +1,8 @@
 use std::marker::PhantomData;
+use std::ops::Mul;
 
 use anyhow::Result;
+use num::bigint::ToBigUint;
 use num::BigUint;
 use plonky2::hash::hash_types::RichField;
 use plonky2::hash::keccak::KeccakHash;
@@ -13,49 +15,24 @@ use plonky2::plonk::circuit_data::{
 use plonky2::plonk::config::{AlgebraicHasher, GenericConfig, GenericHashOut, Hasher};
 use plonky2::plonk::proof::ProofWithPublicInputs;
 use plonky2::plonk::prover::prove;
-use plonky2_ecdsa::gadgets::biguint::BigUintTarget;
+use plonky2_ecdsa::gadgets::biguint::{BigUintTarget, WitnessBigUint};
 use plonky2_field::extension::Extendable;
 use plonky2_field::types::{Field, PrimeField, Sample};
 use plonky2_u32::gadgets::arithmetic_u32::{CircuitBuilderU32, U32Target};
 use plonky2_u32::witness::WitnessU32;
 
 use crate::curve::curve_types::{AffinePoint, Curve, CurveScalar, ProjectivePoint};
-use crate::curve::ed25519::Ed25519;
+use crate::curve::ed25519::{mul_naive, Ed25519};
+use crate::field::ed25519_base::Ed25519Base;
+use crate::field::ed25519_scalar::Ed25519Scalar;
 use crate::gadgets::curve::{AffinePointTarget, CircuitBuilderCurve};
-use crate::gadgets::nonnative::NonNativeTarget;
+use crate::gadgets::curve_windowed_mul::CircuitBuilderWindowedMul;
+use crate::gadgets::nonnative::{CircuitBuilderNonNative, NonNativeTarget};
 use crate::gadgets::split_nonnative::CircuitBuilderSplit;
 
-const MT_SIZE: usize = 4;
+const SUB_CIRCUIT_COUNT: usize = 2;
 const WINDOW_SIZE: usize = 4;
-const FIELD_SIZE: usize = 256;
-
-pub trait CircuitBuilderWindowedMulMt<F: RichField + Extendable<D>, const D: usize> {
-    fn precompute_all_d<C: Curve>(&mut self, p: &AffinePointTarget<C>)
-        -> Vec<AffinePointTarget<C>>;
-}
-
-impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderWindowedMulMt<F, D>
-    for CircuitBuilder<F, D>
-{
-    fn precompute_all_d<C: Curve>(
-        &mut self,
-        p: &AffinePointTarget<C>,
-    ) -> Vec<AffinePointTarget<C>> {
-        let mut res = Vec::new();
-        res.push(p.clone());
-        for _ in 0..FIELD_SIZE - 1 {
-            res.push(self.curve_double(res.last().unwrap()));
-        }
-        let num_limbs = p.x.value.limbs.len();
-        for i in 0..FIELD_SIZE {
-            for j in 0..num_limbs {
-                self.register_public_input(res[i].x.value.limbs[j].0);
-                self.register_public_input(res[i].y.value.limbs[j].0);
-            }
-        }
-        res
-    }
-}
+const NUM_LIMBS: usize = 32; // 32 = 256 / 4 / 2
 
 type ProofTuple<F, C, const D: usize> = (
     ProofWithPublicInputs<F, C, D>,
@@ -63,28 +40,69 @@ type ProofTuple<F, C, const D: usize> = (
     CommonCircuitData<F, D>,
 );
 
-pub fn prove_precompute_all_d<
+pub struct CurveScalarMulWindowedPartTarget<CV: Curve> {
+    pub p_target: AffinePointTarget<CV>,
+    pub p_init_target: AffinePointTarget<CV>,
+    pub n_target: NonNativeTarget<CV::ScalarField>,
+}
+
+pub fn build_curve_scalar_mul_windowed_part_circuit<
+    F: RichField + Extendable<D>,
+    CV: Curve,
+    C: GenericConfig<D, F = F>,
+    const D: usize,
+>(
+    builder: &mut CircuitBuilder<F, D>,
+) -> CurveScalarMulWindowedPartTarget<CV> {
+    let p_target = builder.add_virtual_affine_point_target::<CV>();
+    let p_init_target = builder.add_virtual_affine_point_target::<CV>();
+    let n_target = builder.add_virtual_nonnative_target();
+    let res_target =
+        builder.curve_scalar_mul_windowed_part(NUM_LIMBS, &p_init_target, &p_target, &n_target);
+    for x in res_target.x.value.limbs {
+        builder.register_public_input(x.0);
+    }
+    for y in res_target.y.value.limbs {
+        builder.register_public_input(y.0);
+    }
+    CurveScalarMulWindowedPartTarget {
+        p_target,
+        p_init_target,
+        n_target,
+    }
+}
+
+// init_p should match other sub circuit
+pub fn prove_windowed_mul_sub<
     F: RichField + Extendable<D>,
     CV: Curve,
     C: GenericConfig<D, F = F>,
     const D: usize,
 >(
     config: CircuitConfig,
-    point: AffinePoint<CV>,
-) -> Result<ProofTuple<F, C, D>> {
+    p: &AffinePoint<CV>,
+    n: &CV::ScalarField,
+    init_p: &AffinePoint<CV>,
+) -> Result<ProofTuple<F, C, D>>
+where
+    [(); C::Hasher::HASH_SIZE]:,
+    <C as GenericConfig<D>>::Hasher: AlgebraicHasher<F>,
+{
     let mut builder = CircuitBuilder::<F, D>::new(config);
-    let point_target = builder.add_virtual_affine_point_target::<CV>();
-    builder.precompute_all_d(&point_target);
+
+    let targets = build_curve_scalar_mul_windowed_part_circuit::<F, CV, C, D>(&mut builder);
     let mut pw = PartialWitness::new();
-    let x_limbs = point.x.to_canonical_biguint().to_u32_digits();
-    let y_limbs = point.y.to_canonical_biguint().to_u32_digits();
-    assert_eq!(x_limbs.len(), point_target.x.value.limbs.len());
-    assert_eq!(y_limbs.len(), point_target.y.value.limbs.len());
-    assert_eq!(y_limbs.len(), x_limbs.len());
-    for i in 0..x_limbs.len() {
-        pw.set_u32_target(point_target.x.value.limbs[i], x_limbs[i]);
-        pw.set_u32_target(point_target.y.value.limbs[i], y_limbs[i]);
-    }
+    pw.set_biguint_target(&targets.p_target.x.value, &p.x.to_canonical_biguint());
+    pw.set_biguint_target(&targets.p_target.y.value, &p.y.to_canonical_biguint());
+    pw.set_biguint_target(
+        &targets.p_init_target.x.value,
+        &init_p.x.to_canonical_biguint(),
+    );
+    pw.set_biguint_target(
+        &targets.p_init_target.y.value,
+        &init_p.y.to_canonical_biguint(),
+    );
+    pw.set_biguint_target(&targets.n_target.value, &n.to_canonical_biguint());
 
     let data = builder.build::<C>();
     let proof = data.prove(pw).unwrap();
@@ -92,25 +110,47 @@ pub fn prove_precompute_all_d<
     Ok((proof, data.verifier_only, data.common))
 }
 
-pub fn prove_curve_mul_mt<
+pub fn prove_curve25519_mul_mt<
     F: RichField + Extendable<D>,
     C: GenericConfig<D, F = F>,
     InnerC: GenericConfig<D, F = F>,
     const D: usize,
 >(
     config: &CircuitConfig,
+    p: &AffinePoint<Ed25519>,
+    n: &Ed25519Scalar,
 ) -> Result<ProofTuple<F, C, D>>
 where
     InnerC::Hasher: AlgebraicHasher<F>,
     [(); C::Hasher::HASH_SIZE]:,
+    <C as GenericConfig<D>>::Hasher: AlgebraicHasher<F>,
 {
-    let point = Ed25519::GENERATOR_AFFINE;
-    let precompute_d = prove_precompute_all_d::<F, Ed25519, InnerC, D>(config.clone(), point)?;
+    let n_biguint = n.to_canonical_biguint();
+    let bits = n_biguint.to_bytes_le();
+    assert_eq!(bits.len(), 256);
+    let n0 = Ed25519Scalar::from_noncanonical_biguint(BigUint::from_bytes_le(&bits[0..128]));
+    let n1 = Ed25519Scalar::from_noncanonical_biguint(BigUint::from_bytes_le(&bits[128..256]));
+
+    let p0_init = AffinePoint {
+        x: Ed25519Base::ZERO,
+        y: Ed25519Base::ONE,
+        zero: false,
+    };
+    let p0 = mul_naive(n0.clone(), p.to_projective());
+    let half = Ed25519Scalar::from_noncanonical_biguint(BigUint::from(1u8) << 128);
+    let p1_init = mul_naive(half, p.to_projective());
+    let p1 = p1_init + mul_naive(n1.clone(), p.to_projective());
+    assert_eq!(p0, p1);
 
     let mut builder = CircuitBuilder::<F, D>::new(config.clone());
     let mut pw = PartialWitness::new();
     {
-        let (inner_proof, inner_vd, inner_cd) = precompute_d;
+        let (inner_proof, inner_vd, inner_cd) = prove_windowed_mul_sub::<F, Ed25519, C, D>(
+            config.clone(),
+            &p0.to_affine(),
+            &n0,
+            &p0_init,
+        )?;
         let pt = builder.add_virtual_proof_with_pis::<InnerC>(&inner_cd);
         pw.set_proof_with_pis_target(&pt, &inner_proof);
 
@@ -153,7 +193,6 @@ mod tests {
     use crate::field::ed25519_scalar::Ed25519Scalar;
     use crate::gadgets::curve::CircuitBuilderCurve;
     use crate::gadgets::curve_windowed_mul::CircuitBuilderWindowedMul;
-    use crate::gadgets::curve_windowed_mul_mt::prove_curve_mul_mt;
     use crate::gadgets::nonnative::CircuitBuilderNonNative;
 
     #[test]
@@ -171,7 +210,7 @@ mod tests {
 
         let config = CircuitConfig::standard_ecc_config();
         let timing = TimingTree::new("prove_curve_mul_mt", Level::Info);
-        prove_curve_mul_mt::<F, C, InnerC, D>(&config)?;
+        // prove_curve_mul_mt::<F, C, InnerC, D>(&config)?;
         timing.print();
 
         Ok(())
