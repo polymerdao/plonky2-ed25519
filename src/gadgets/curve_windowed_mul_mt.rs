@@ -3,7 +3,7 @@ use std::ops::Mul;
 
 use anyhow::Result;
 use num::bigint::ToBigUint;
-use num::BigUint;
+use num::{BigUint, One};
 use plonky2::hash::hash_types::RichField;
 use plonky2::hash::keccak::KeccakHash;
 use plonky2::iop::target::Target;
@@ -119,6 +119,7 @@ pub fn prove_curve25519_mul_mt<
     config: &CircuitConfig,
     p: &AffinePoint<Ed25519>,
     n: &Ed25519Scalar,
+    res: &AffinePoint<Ed25519>,
 ) -> Result<ProofTuple<F, C, D>>
 where
     InnerC::Hasher: AlgebraicHasher<F>,
@@ -126,31 +127,52 @@ where
     <C as GenericConfig<D>>::Hasher: AlgebraicHasher<F>,
 {
     let n_biguint = n.to_canonical_biguint();
-    let bits = n_biguint.to_bytes_le();
-    assert_eq!(bits.len(), 256);
-    let n0 = Ed25519Scalar::from_noncanonical_biguint(BigUint::from_bytes_le(&bits[0..128]));
-    let n1 = Ed25519Scalar::from_noncanonical_biguint(BigUint::from_bytes_le(&bits[128..256]));
+    let mut mask = BigUint::one();
+    mask = (mask << 128) - BigUint::one();
+    let n0_biguint = n_biguint.clone() & mask.clone();
+    let mut n1_biguint = n_biguint.clone();
+    n1_biguint = (n1_biguint >> 128) & mask.clone();
+    assert_eq!(n_biguint, n0_biguint.clone() + (n1_biguint.clone() << 128));
+    let n0 = Ed25519Scalar::from_noncanonical_biguint(n0_biguint);
+    let n1 = Ed25519Scalar::from_noncanonical_biguint(n1_biguint);
 
     let p0_init = AffinePoint {
         x: Ed25519Base::ZERO,
         y: Ed25519Base::ONE,
         zero: false,
     };
-    let p0 = mul_naive(n0.clone(), p.to_projective());
-    let half = Ed25519Scalar::from_noncanonical_biguint(BigUint::from(1u8) << 128);
-    let p1_init = mul_naive(half, p.to_projective());
-    let p1 = p1_init + mul_naive(n1.clone(), p.to_projective());
-    assert_eq!(p0, p1);
+    let p1_init = (CurveScalar::<Ed25519>(n0.clone()) * p.to_projective()).to_affine();
+    let b128 = Ed25519Scalar::from_noncanonical_biguint(BigUint::from(1u8) << 128);
+    let p1 = (CurveScalar::<Ed25519>(b128) * p.to_projective()).to_affine();
+    let q1_expected =
+        p1_init + (CurveScalar::<Ed25519>(n1.clone()) * p1.to_projective()).to_affine();
+    let q_expected = (CurveScalar::<Ed25519>(n.clone()) * p.to_projective()).to_affine();
+    assert_eq!(q1_expected, q_expected);
 
     let mut builder = CircuitBuilder::<F, D>::new(config.clone());
     let mut pw = PartialWitness::new();
     {
-        let (inner_proof, inner_vd, inner_cd) = prove_windowed_mul_sub::<F, Ed25519, C, D>(
-            config.clone(),
-            &p0.to_affine(),
-            &n0,
-            &p0_init,
-        )?;
+        let (inner_proof, inner_vd, inner_cd) =
+            prove_windowed_mul_sub::<F, Ed25519, C, D>(config.clone(), &p, &n0, &p0_init)?;
+        let pt = builder.add_virtual_proof_with_pis::<InnerC>(&inner_cd);
+        pw.set_proof_with_pis_target(&pt, &inner_proof);
+
+        let inner_data = VerifierCircuitTarget {
+            constants_sigmas_cap: builder.add_virtual_cap(inner_cd.config.fri_config.cap_height),
+            circuit_digest: builder.add_virtual_hash(),
+        };
+        pw.set_cap_target(
+            &inner_data.constants_sigmas_cap,
+            &inner_vd.constants_sigmas_cap,
+        );
+        pw.set_hash_target(inner_data.circuit_digest, inner_vd.circuit_digest);
+
+        builder.verify_proof::<InnerC>(&pt, &inner_data, &inner_cd);
+    }
+
+    {
+        let (inner_proof, inner_vd, inner_cd) =
+            prove_windowed_mul_sub::<F, Ed25519, C, D>(config.clone(), &p1, &n1, &p1_init)?;
         let pt = builder.add_virtual_proof_with_pis::<InnerC>(&inner_cd);
         pw.set_proof_with_pis_target(&pt, &inner_proof);
 
@@ -170,7 +192,6 @@ where
     let data = builder.build::<C>();
     let proof = data.prove(pw).unwrap();
     data.verify(proof.clone())?;
-
     Ok((proof, data.verifier_only, data.common))
 }
 
@@ -193,10 +214,11 @@ mod tests {
     use crate::field::ed25519_scalar::Ed25519Scalar;
     use crate::gadgets::curve::CircuitBuilderCurve;
     use crate::gadgets::curve_windowed_mul::CircuitBuilderWindowedMul;
+    use crate::gadgets::curve_windowed_mul_mt::prove_curve25519_mul_mt;
     use crate::gadgets::nonnative::CircuitBuilderNonNative;
 
     #[test]
-    fn test_pre_compute_all_d() -> Result<()> {
+    fn test_prove_curve25519_mul_mt() -> Result<()> {
         // Initialize logging
         let mut builder = env_logger::Builder::from_default_env();
         builder.format_timestamp(None);
@@ -208,9 +230,15 @@ mod tests {
         type InnerC = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
 
+        let g = (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
+        let five = Ed25519Scalar::from_canonical_usize(5);
+        let neg_five = five.neg();
+        let neg_five_scalar = CurveScalar::<Ed25519>(neg_five);
+        let neg_five_g = (neg_five_scalar * g.to_projective()).to_affine();
+
         let config = CircuitConfig::standard_ecc_config();
         let timing = TimingTree::new("prove_curve_mul_mt", Level::Info);
-        // prove_curve_mul_mt::<F, C, InnerC, D>(&config)?;
+        prove_curve25519_mul_mt::<F, C, InnerC, D>(&config, &g, &neg_five, &neg_five_g)?;
         timing.print();
 
         Ok(())
