@@ -112,7 +112,7 @@ pub fn load_curve_scalar_mul_windowed_part_circuit_public_inputs_target<
         builder.connect(public_input_targets[index], y.0);
         index = index + 1;
     }
-    assert_eq!(index - 1, public_input_targets.len());
+    assert_eq!(index, public_input_targets.len());
 
     CurveScalarMulWindowedPartTarget {
         p_target,
@@ -209,7 +209,6 @@ pub struct CurveScalarMulMtData<CV: Curve, const D: usize> {
     pub proof0: ProofWithPublicInputsTarget<D>,
     pub proof1: ProofWithPublicInputsTarget<D>,
     pub p_target: AffinePointTarget<CV>,
-    pub q_init_target: AffinePointTarget<CV>,
     pub n_target: NonNativeTarget<CV::ScalarField>,
     pub q_target: AffinePointTarget<CV>,
 }
@@ -233,7 +232,6 @@ where
     let proof0 = builder.add_virtual_proof_with_pis::<C>(&circuit_data.common);
     let proof1 = builder.add_virtual_proof_with_pis::<C>(&circuit_data.common);
     let p_target = builder.add_virtual_affine_point_target();
-    let q_init_target = builder.add_virtual_affine_point_target();
     let n_target = builder.add_virtual_nonnative_target();
     let q_target = builder.add_virtual_affine_point_target();
 
@@ -298,7 +296,6 @@ where
         proof0,
         proof1,
         p_target,
-        q_init_target,
         n_target,
         q_target,
     })
@@ -307,16 +304,13 @@ where
 pub fn prove_curve25519_mul_mt<
     F: RichField + Extendable<D>,
     C: GenericConfig<D, F = F>,
-    InnerC: GenericConfig<D, F = F>,
     const D: usize,
 >(
     config: &CircuitConfig,
     p: &AffinePoint<Ed25519>,
     n: &Ed25519Scalar,
-    res: &AffinePoint<Ed25519>,
 ) -> Result<ProofTuple<F, C, D>>
 where
-    InnerC::Hasher: AlgebraicHasher<F>,
     [(); C::Hasher::HASH_SIZE]:,
     <C as GenericConfig<D>>::Hasher: AlgebraicHasher<F>,
 {
@@ -336,9 +330,7 @@ where
         zero: false,
     };
     let q1_init = (CurveScalar::<Ed25519>(n0.clone()) * p.to_projective()).to_affine();
-
     let q_expected = (CurveScalar::<Ed25519>(n.clone()) * p.to_projective()).to_affine();
-    assert_eq!(q_expected, *res);
 
     let mut builder = CircuitBuilder::<F, D>::new(config.clone());
     let mut pw = PartialWitness::new();
@@ -366,8 +358,14 @@ where
     pw.set_biguint_target(&targets.n_target.value, &n_biguint);
     pw.set_biguint_target(&targets.p_target.x.value, &p.x.to_canonical_biguint());
     pw.set_biguint_target(&targets.p_target.y.value, &p.y.to_canonical_biguint());
-    pw.set_biguint_target(&targets.q_target.x.value, &res.x.to_canonical_biguint());
-    pw.set_biguint_target(&targets.q_target.y.value, &res.y.to_canonical_biguint());
+    pw.set_biguint_target(
+        &targets.q_target.x.value,
+        &q_expected.x.to_canonical_biguint(),
+    );
+    pw.set_biguint_target(
+        &targets.q_target.y.value,
+        &q_expected.y.to_canonical_biguint(),
+    );
 
     let data = builder.build::<C>();
     let proof = data.prove(pw).unwrap();
@@ -392,7 +390,7 @@ mod tests {
     use crate::gadgets::curve_windowed_mul_mt::prove_curve25519_mul_mt;
 
     #[test]
-    #[ignore]
+    //#[ignore]
     fn test_prove_curve25519_mul_mt() -> Result<()> {
         // Initialize logging
         let mut builder = env_logger::Builder::from_default_env();
@@ -402,18 +400,15 @@ mod tests {
 
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
-        type InnerC = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
 
         let g = (CurveScalar(Ed25519Scalar::rand()) * Ed25519::GENERATOR_PROJECTIVE).to_affine();
         let five = Ed25519Scalar::from_canonical_usize(5);
         let neg_five = five.neg();
-        let neg_five_scalar = CurveScalar::<Ed25519>(neg_five);
-        let neg_five_g = (neg_five_scalar * g.to_projective()).to_affine();
 
         let config = CircuitConfig::standard_ecc_config();
         let timing = TimingTree::new("prove_curve_mul_mt", Level::Info);
-        prove_curve25519_mul_mt::<F, C, InnerC, D>(&config, &g, &neg_five, &neg_five_g)?;
+        prove_curve25519_mul_mt::<F, C, D>(&config, &g, &neg_five)?;
         timing.print();
 
         Ok(())

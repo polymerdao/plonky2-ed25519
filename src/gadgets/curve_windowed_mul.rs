@@ -8,7 +8,7 @@ use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::config::{GenericHashOut, Hasher};
 use plonky2_ecdsa::gadgets::biguint::BigUintTarget;
 use plonky2_field::extension::Extendable;
-use plonky2_field::types::{Field, Sample};
+use plonky2_field::types::Field;
 use plonky2_u32::gadgets::arithmetic_u32::{CircuitBuilderU32, U32Target};
 
 use crate::curve::curve_types::{AffinePoint, Curve, CurveScalar};
