@@ -53,7 +53,11 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderWindowedMul<F, 
         &mut self,
         p: &AffinePointTarget<C>,
     ) -> Vec<AffinePointTarget<C>> {
-        let g = (CurveScalar(C::ScalarField::rand()) * C::GENERATOR_PROJECTIVE).to_affine();
+        let hash_0 = KeccakHash::<25>::hash_no_pad(&[F::ZERO]);
+        let hash_0_scalar = C::ScalarField::from_noncanonical_biguint(BigUint::from_bytes_le(
+            &GenericHashOut::<F>::to_bytes(&hash_0),
+        ));
+        let g = (CurveScalar(hash_0_scalar) * C::GENERATOR_PROJECTIVE).to_affine();
         let neg = {
             let mut neg = g;
             neg.x = -neg.x;
