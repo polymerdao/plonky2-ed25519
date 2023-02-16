@@ -11,7 +11,7 @@ use plonky2_field::extension::Extendable;
 use plonky2_field::types::{Field, Sample};
 use plonky2_u32::gadgets::arithmetic_u32::{CircuitBuilderU32, U32Target};
 
-use crate::curve::curve_types::{Curve, CurveScalar};
+use crate::curve::curve_types::{AffinePoint, Curve, CurveScalar};
 use crate::gadgets::curve::{AffinePointTarget, CircuitBuilderCurve};
 use crate::gadgets::nonnative::NonNativeTarget;
 use crate::gadgets::split_nonnative::CircuitBuilderSplit;
@@ -36,11 +36,12 @@ pub trait CircuitBuilderWindowedMul<F: RichField + Extendable<D>, const D: usize
         n: &NonNativeTarget<C::ScalarField>,
     ) -> AffinePointTarget<C>;
 
-    // returns n(first num_limbs)*p+init
+    // returns n(first num_limbs) * p + q_init
     fn curve_scalar_mul_windowed_part<C: Curve>(
         &mut self,
         num_limbs: usize,
         p: &AffinePointTarget<C>,
+        q_init: &AffinePointTarget<C>,
         n: &NonNativeTarget<C::ScalarField>,
     ) -> AffinePointTarget<C>;
 }
@@ -122,13 +123,20 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderWindowedMul<F, 
     ) -> AffinePointTarget<C> {
         let num_limbs = C::ScalarField::BITS / WINDOW_SIZE;
         assert_eq!(num_limbs * WINDOW_SIZE, C::ScalarField::BITS);
-        self.curve_scalar_mul_windowed_part(num_limbs, p, n)
+        let q_init = AffinePoint {
+            x: C::BaseField::ZERO,
+            y: C::BaseField::ONE,
+            zero: false,
+        };
+        let q_init = self.constant_affine_point(q_init);
+        self.curve_scalar_mul_windowed_part(num_limbs, p, &q_init, n)
     }
 
     fn curve_scalar_mul_windowed_part<C: Curve>(
         &mut self,
         num_limbs: usize,
         p: &AffinePointTarget<C>,
+        q_init: &AffinePointTarget<C>,
         n: &NonNativeTarget<C::ScalarField>,
     ) -> AffinePointTarget<C> {
         let hash_0 = KeccakHash::<25>::hash_no_pad(&[F::ZERO]);
@@ -146,6 +154,7 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderWindowedMul<F, 
         };
 
         let mut result = self.constant_affine_point(starting_point.to_affine());
+        result = self.curve_add(&result, &q_init);
 
         let precomputation = self.precompute_window(p);
         let zero = self.zero();
