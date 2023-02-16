@@ -1,4 +1,5 @@
 use anyhow::Result;
+use log::Level;
 use num::{BigUint, One};
 use plonky2::hash::hash_types::RichField;
 use plonky2::iop::target::Target;
@@ -9,6 +10,7 @@ use plonky2::plonk::circuit_data::{
 };
 use plonky2::plonk::config::{AlgebraicHasher, GenericConfig, Hasher};
 use plonky2::plonk::proof::{ProofWithPublicInputs, ProofWithPublicInputsTarget};
+use plonky2::util::timing::TimingTree;
 use plonky2_ecdsa::gadgets::biguint::WitnessBigUint;
 use plonky2_field::extension::Extendable;
 use plonky2_field::types::{Field, PrimeField};
@@ -80,8 +82,7 @@ pub fn load_curve_scalar_mul_windowed_part_circuit_public_inputs_target<
     let p_target = builder.add_virtual_affine_point_target::<CV>();
     let q_init_target = builder.add_virtual_affine_point_target::<CV>();
     let n_target = builder.add_virtual_nonnative_target();
-    let q_target =
-        builder.curve_scalar_mul_windowed_part(NUM_LIMBS, &p_target, &q_init_target, &n_target);
+    let q_target = builder.add_virtual_affine_point_target::<CV>();
 
     let mut index = 0;
     for x in &p_target.x.value.limbs {
@@ -199,7 +200,9 @@ where
     pw.set_biguint_target(&targets.n_target.value, &n.to_canonical_biguint());
 
     let data = builder.build::<C>();
+    let timing = TimingTree::new("prove curve_scalar_mul_windowed_part", Level::Info);
     let proof = data.prove(pw).unwrap();
+    timing.print();
 
     Ok((proof, data.verifier_only, data.common))
 }
@@ -368,7 +371,9 @@ where
     );
 
     let data = builder.build::<C>();
+    let timing = TimingTree::new("prove curve25519_mul_mt", Level::Info);
     let proof = data.prove(pw).unwrap();
+    timing.print();
     data.verify(proof.clone())?;
     Ok((proof, data.verifier_only, data.common))
 }
@@ -378,10 +383,9 @@ mod tests {
     use std::ops::Neg;
 
     use anyhow::Result;
-    use log::{Level, LevelFilter};
+    use log::LevelFilter;
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
-    use plonky2::util::timing::TimingTree;
     use plonky2_field::types::{Field, Sample};
 
     use crate::curve::curve_types::{Curve, CurveScalar};
@@ -390,7 +394,7 @@ mod tests {
     use crate::gadgets::curve_windowed_mul_mt::prove_curve25519_mul_mt;
 
     #[test]
-    //#[ignore]
+    // #[ignore]
     fn test_prove_curve25519_mul_mt() -> Result<()> {
         // Initialize logging
         let mut builder = env_logger::Builder::from_default_env();
@@ -407,9 +411,7 @@ mod tests {
         let neg_five = five.neg();
 
         let config = CircuitConfig::standard_ecc_config();
-        let timing = TimingTree::new("prove_curve_mul_mt", Level::Info);
         prove_curve25519_mul_mt::<F, C, D>(&config, &g, &neg_five)?;
-        timing.print();
 
         Ok(())
     }
