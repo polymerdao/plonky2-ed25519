@@ -1,6 +1,7 @@
 use anyhow::Result;
 use log::Level;
 use num::{BigUint, One};
+use plonky2::gates::noop::NoopGate;
 use plonky2::hash::hash_types::RichField;
 use plonky2::iop::target::Target;
 use plonky2::iop::witness::{PartialWitness, WitnessWrite};
@@ -15,6 +16,7 @@ use plonky2_ecdsa::gadgets::biguint::WitnessBigUint;
 use plonky2_field::extension::Extendable;
 use plonky2_field::types::{Field, PrimeField};
 use plonky2_u32::gadgets::arithmetic_u32::CircuitBuilderU32;
+use rayon::scope;
 
 use crate::curve::curve_types::{AffinePoint, Curve, CurveScalar};
 use crate::curve::ed25519::Ed25519;
@@ -200,9 +202,7 @@ where
     pw.set_biguint_target(&targets.n_target.value, &n.to_canonical_biguint());
 
     let data = builder.build::<C>();
-    let timing = TimingTree::new("prove curve_scalar_mul_windowed_part", Level::Info);
     let proof = data.prove(pw).unwrap();
-    timing.print();
 
     Ok((proof, data.verifier_only, data.common))
 }
@@ -304,6 +304,24 @@ where
     })
 }
 
+fn dummy_proof<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
+    config: &CircuitConfig,
+    num_dummy_gates: u64,
+) -> Result<ProofWithPublicInputs<F, C, D>>
+where
+    [(); C::Hasher::HASH_SIZE]:,
+{
+    let mut builder = CircuitBuilder::<F, D>::new(config.clone());
+    for _ in 0..num_dummy_gates {
+        builder.add_gate(NoopGate, vec![]);
+    }
+
+    let data = builder.build::<C>();
+    let inputs = PartialWitness::new();
+    let proof = data.prove(inputs)?;
+    Ok(proof)
+}
+
 pub fn prove_curve25519_mul_mt<
     F: RichField + Extendable<D>,
     C: GenericConfig<D, F = F>,
@@ -342,20 +360,34 @@ where
         &mut builder,
     )?;
 
-    let (proof0, _, _) = prove_curve_scalar_mul_windowed_part::<F, Ed25519, C, D>(
-        config.clone(),
-        &p,
-        &q0_init,
-        &n0,
-    )?;
-    pw.set_proof_with_pis_target(&targets.proof0, &proof0);
+    let timing = TimingTree::new("prove 2 sub-circuits", Level::Info);
+    let mut proof0 = dummy_proof::<F, C, D>(&config, 1)?;
+    let mut proof1 = proof0.clone();
+    scope(|s| {
+        s.spawn(|_| {
+            proof0 = prove_curve_scalar_mul_windowed_part::<F, Ed25519, C, D>(
+                config.clone(),
+                &p,
+                &q0_init,
+                &n0,
+            )
+            .unwrap()
+            .0;
+        });
+        s.spawn(|_| {
+            proof1 = prove_curve_scalar_mul_windowed_part::<F, Ed25519, C, D>(
+                config.clone(),
+                &p,
+                &q1_init,
+                &n1,
+            )
+            .unwrap()
+            .0;
+        });
+    });
+    timing.print();
 
-    let (proof1, _, _) = prove_curve_scalar_mul_windowed_part::<F, Ed25519, C, D>(
-        config.clone(),
-        &p,
-        &q1_init,
-        &n1,
-    )?;
+    pw.set_proof_with_pis_target(&targets.proof0, &proof0);
     pw.set_proof_with_pis_target(&targets.proof1, &proof1);
 
     pw.set_biguint_target(&targets.n_target.value, &n_biguint);
