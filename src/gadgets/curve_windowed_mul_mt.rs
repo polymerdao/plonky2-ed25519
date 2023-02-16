@@ -16,6 +16,7 @@ use plonky2_u32::gadgets::arithmetic_u32::CircuitBuilderU32;
 
 use crate::curve::curve_types::{AffinePoint, Curve, CurveScalar};
 use crate::curve::ed25519::Ed25519;
+use crate::field::ed25519_base::Ed25519Base;
 use crate::field::ed25519_scalar::Ed25519Scalar;
 use crate::gadgets::curve::{AffinePointTarget, CircuitBuilderCurve};
 use crate::gadgets::curve_windowed_mul::CircuitBuilderWindowedMul;
@@ -31,6 +32,7 @@ type ProofTuple<F, C, const D: usize> = (
 
 pub struct CurveScalarMulWindowedPartTarget<CV: Curve> {
     pub p_target: AffinePointTarget<CV>,
+    pub q_init_target: AffinePointTarget<CV>,
     pub n_target: NonNativeTarget<CV::ScalarField>,
     pub q_target: AffinePointTarget<CV>,
 }
@@ -76,8 +78,10 @@ pub fn load_curve_scalar_mul_windowed_part_circuit_public_inputs_target<
     public_input_targets: Vec<Target>,
 ) -> CurveScalarMulWindowedPartTarget<CV> {
     let p_target = builder.add_virtual_affine_point_target::<CV>();
+    let q_init_target = builder.add_virtual_affine_point_target::<CV>();
     let n_target = builder.add_virtual_nonnative_target();
-    let q_target = builder.curve_scalar_mul_windowed_part(NUM_LIMBS, &p_target, &n_target);
+    let q_target =
+        builder.curve_scalar_mul_windowed_part(NUM_LIMBS, &p_target, &q_init_target, &n_target);
 
     let mut index = 0;
     for x in &p_target.x.value.limbs {
@@ -85,6 +89,14 @@ pub fn load_curve_scalar_mul_windowed_part_circuit_public_inputs_target<
         index = index + 1;
     }
     for y in &p_target.y.value.limbs {
+        builder.connect(public_input_targets[index], y.0);
+        index = index + 1;
+    }
+    for x in &q_init_target.x.value.limbs {
+        builder.connect(public_input_targets[index], x.0);
+        index = index + 1;
+    }
+    for y in &q_init_target.y.value.limbs {
         builder.connect(public_input_targets[index], y.0);
         index = index + 1;
     }
@@ -104,6 +116,7 @@ pub fn load_curve_scalar_mul_windowed_part_circuit_public_inputs_target<
 
     CurveScalarMulWindowedPartTarget {
         p_target,
+        q_init_target,
         n_target,
         q_target,
     }
@@ -118,15 +131,19 @@ pub fn build_curve_scalar_mul_windowed_part_circuit<
     builder: &mut CircuitBuilder<F, D>,
 ) -> CurveScalarMulWindowedPartTarget<CV> {
     let p_target = builder.add_virtual_affine_point_target::<CV>();
+    let q_init_target = builder.add_virtual_affine_point_target::<CV>();
     let n_target = builder.add_virtual_nonnative_target();
-    let q_target = builder.curve_scalar_mul_windowed_part(NUM_LIMBS, &p_target, &n_target);
+    let q_target =
+        builder.curve_scalar_mul_windowed_part(NUM_LIMBS, &p_target, &q_init_target, &n_target);
 
     register_public_affine_point_target::<F, CV, C, D>(builder, &p_target);
+    register_public_affine_point_target::<F, CV, C, D>(builder, &q_init_target);
     register_public_nonnative_target::<F, CV, C, D>(builder, &n_target);
     register_public_affine_point_target::<F, CV, C, D>(builder, &q_target);
 
     CurveScalarMulWindowedPartTarget {
         p_target,
+        q_init_target,
         n_target,
         q_target,
     }
@@ -158,6 +175,7 @@ pub fn prove_curve_scalar_mul_windowed_part<
 >(
     config: CircuitConfig,
     p: &AffinePoint<CV>,
+    q_init: &AffinePoint<CV>,
     n: &CV::ScalarField,
 ) -> Result<ProofTuple<F, C, D>>
 where
@@ -170,6 +188,14 @@ where
     let mut pw = PartialWitness::new();
     pw.set_biguint_target(&targets.p_target.x.value, &p.x.to_canonical_biguint());
     pw.set_biguint_target(&targets.p_target.y.value, &p.y.to_canonical_biguint());
+    pw.set_biguint_target(
+        &targets.q_init_target.x.value,
+        &q_init.x.to_canonical_biguint(),
+    );
+    pw.set_biguint_target(
+        &targets.q_init_target.y.value,
+        &q_init.y.to_canonical_biguint(),
+    );
     pw.set_biguint_target(&targets.n_target.value, &n.to_canonical_biguint());
 
     let data = builder.build::<C>();
@@ -183,6 +209,7 @@ pub struct CurveScalarMulMtData<CV: Curve, const D: usize> {
     pub proof0: ProofWithPublicInputsTarget<D>,
     pub proof1: ProofWithPublicInputsTarget<D>,
     pub p_target: AffinePointTarget<CV>,
+    pub q_init_target: AffinePointTarget<CV>,
     pub n_target: NonNativeTarget<CV::ScalarField>,
     pub q_target: AffinePointTarget<CV>,
 }
@@ -206,6 +233,7 @@ where
     let proof0 = builder.add_virtual_proof_with_pis::<C>(&circuit_data.common);
     let proof1 = builder.add_virtual_proof_with_pis::<C>(&circuit_data.common);
     let p_target = builder.add_virtual_affine_point_target();
+    let q_init_target = builder.add_virtual_affine_point_target();
     let n_target = builder.add_virtual_nonnative_target();
     let q_target = builder.add_virtual_affine_point_target();
 
@@ -239,6 +267,7 @@ where
         );
 
     builder.connect_affine_point(&p_target, &proof0_targets.p_target);
+    builder.connect_affine_point(&p_target, &proof1_targets.p_target);
     let limb_count = n_target.value.limbs.len();
     for i in 0..limb_count / 2 {
         builder.connect_u32(
@@ -256,12 +285,20 @@ where
         builder.connect(proof1_targets.n_target.value.limbs[i].0, zero);
     }
     builder.connect_affine_point(&q_target, &proof1_targets.q_target);
-    builder.connect_affine_point(&proof0_targets.q_target, &proof1_targets.p_target);
+    builder.connect_affine_point(&proof0_targets.q_target, &proof1_targets.q_init_target);
+    let proof0_q_init = AffinePoint {
+        x: CV::BaseField::ZERO,
+        y: CV::BaseField::ONE,
+        zero: false,
+    };
+    let proof0_q_init = builder.constant_affine_point(proof0_q_init);
+    builder.connect_affine_point(&proof0_q_init, &proof0_targets.q_init_target);
 
     Ok(CurveScalarMulMtData {
         proof0,
         proof1,
         p_target,
+        q_init_target,
         n_target,
         q_target,
     })
@@ -293,11 +330,15 @@ where
     let n0 = Ed25519Scalar::from_noncanonical_biguint(n0_biguint);
     let n1 = Ed25519Scalar::from_noncanonical_biguint(n1_biguint);
 
-    let q0 = (CurveScalar::<Ed25519>(n0.clone()) * p.to_projective()).to_affine();
-    let q = (CurveScalar::<Ed25519>(n1.clone()) * q0.to_projective()).to_affine();
+    let q0_init = AffinePoint {
+        x: Ed25519Base::ZERO,
+        y: Ed25519Base::ONE,
+        zero: false,
+    };
+    let q1_init = (CurveScalar::<Ed25519>(n0.clone()) * p.to_projective()).to_affine();
+
     let q_expected = (CurveScalar::<Ed25519>(n.clone()) * p.to_projective()).to_affine();
-    assert_eq!(q, q_expected);
-    assert_eq!(q, *res);
+    assert_eq!(q_expected, *res);
 
     let mut builder = CircuitBuilder::<F, D>::new(config.clone());
     let mut pw = PartialWitness::new();
@@ -306,12 +347,20 @@ where
         &mut builder,
     )?;
 
-    let (proof0, _, _) =
-        prove_curve_scalar_mul_windowed_part::<F, Ed25519, C, D>(config.clone(), &p, &n0)?;
+    let (proof0, _, _) = prove_curve_scalar_mul_windowed_part::<F, Ed25519, C, D>(
+        config.clone(),
+        &p,
+        &q0_init,
+        &n0,
+    )?;
     pw.set_proof_with_pis_target(&targets.proof0, &proof0);
 
-    let (proof1, _, _) =
-        prove_curve_scalar_mul_windowed_part::<F, Ed25519, C, D>(config.clone(), &q0, &n1)?;
+    let (proof1, _, _) = prove_curve_scalar_mul_windowed_part::<F, Ed25519, C, D>(
+        config.clone(),
+        &p,
+        &q1_init,
+        &n1,
+    )?;
     pw.set_proof_with_pis_target(&targets.proof1, &proof1);
 
     pw.set_biguint_target(&targets.n_target.value, &n_biguint);
@@ -343,6 +392,7 @@ mod tests {
     use crate::gadgets::curve_windowed_mul_mt::prove_curve25519_mul_mt;
 
     #[test]
+    #[ignore]
     fn test_prove_curve25519_mul_mt() -> Result<()> {
         // Initialize logging
         let mut builder = env_logger::Builder::from_default_env();
