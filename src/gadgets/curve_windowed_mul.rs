@@ -11,7 +11,7 @@ use plonky2_field::extension::Extendable;
 use plonky2_field::types::{Field, Sample};
 use plonky2_u32::gadgets::arithmetic_u32::{CircuitBuilderU32, U32Target};
 
-use crate::curve::curve_types::{AffinePoint, Curve, CurveScalar};
+use crate::curve::curve_types::{Curve, CurveScalar};
 use crate::gadgets::curve::{AffinePointTarget, CircuitBuilderCurve};
 use crate::gadgets::nonnative::NonNativeTarget;
 use crate::gadgets::split_nonnative::CircuitBuilderSplit;
@@ -40,7 +40,6 @@ pub trait CircuitBuilderWindowedMul<F: RichField + Extendable<D>, const D: usize
     fn curve_scalar_mul_windowed_part<C: Curve>(
         &mut self,
         num_limbs: usize,
-        init: &AffinePointTarget<C>,
         p: &AffinePointTarget<C>,
         n: &NonNativeTarget<C::ScalarField>,
     ) -> AffinePointTarget<C>;
@@ -123,19 +122,12 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderWindowedMul<F, 
     ) -> AffinePointTarget<C> {
         let num_limbs = C::ScalarField::BITS / WINDOW_SIZE;
         assert_eq!(num_limbs * WINDOW_SIZE, C::ScalarField::BITS);
-        let init_p = AffinePoint {
-            x: C::BaseField::ZERO,
-            y: C::BaseField::ONE,
-            zero: false,
-        };
-        let init_p_target = self.constant_affine_point(init_p);
-        self.curve_scalar_mul_windowed_part(num_limbs, &init_p_target, p, n)
+        self.curve_scalar_mul_windowed_part(num_limbs, p, n)
     }
 
     fn curve_scalar_mul_windowed_part<C: Curve>(
         &mut self,
         num_limbs: usize,
-        init_p: &AffinePointTarget<C>,
         p: &AffinePointTarget<C>,
         n: &NonNativeTarget<C::ScalarField>,
     ) -> AffinePointTarget<C> {
@@ -144,9 +136,10 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderWindowedMul<F, 
             &GenericHashOut::<F>::to_bytes(&hash_0),
         ));
         let starting_point = CurveScalar(hash_0_scalar) * C::GENERATOR_PROJECTIVE;
+        let num_bits = num_limbs * WINDOW_SIZE;
         let starting_point_multiplied = {
             let mut cur = starting_point;
-            for _ in 0..C::ScalarField::BITS {
+            for _ in 0..num_bits {
                 cur = cur.double();
             }
             cur
@@ -171,7 +164,6 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderWindowedMul<F, 
         let to_subtract = self.constant_affine_point(starting_point_multiplied.to_affine());
         let to_add = self.curve_neg(&to_subtract);
         result = self.curve_add(&result, &to_add);
-        result = self.curve_add(&result, init_p);
 
         result
     }
@@ -266,7 +258,6 @@ mod tests {
         builder.connect_affine_point(&neg_five_g_expected, &neg_five_g_actual);
 
         let data = builder.build::<C>();
-        let config = CircuitConfig::standard_ecc_config();
         let timing = TimingTree::new("prove curve_windowed_mul", Level::Info);
         let proof = data.prove(pw).unwrap();
         timing.print();
